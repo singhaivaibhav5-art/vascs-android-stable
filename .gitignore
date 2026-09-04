@@ -14,3 +14,4 @@ captures/
 # Android generated metadata
 *.dm
 output-metadata.json
+.kotlin/

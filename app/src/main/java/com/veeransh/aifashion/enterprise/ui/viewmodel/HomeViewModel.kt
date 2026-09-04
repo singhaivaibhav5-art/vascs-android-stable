@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.veeransh.aifashion.enterprise.data.repository.ProductRepository
 import com.veeransh.aifashion.enterprise.data.local.entity.ProductEntity
 import com.veeransh.aifashion.enterprise.types.CartItem
+import com.veeransh.aifashion.enterprise.types.UserPDPCouponItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -44,14 +45,14 @@ class HomeViewModel @Inject constructor(
     private val _cartItems = MutableStateFlow<List<CartItem>>(emptyList())
     val cartItems = _cartItems.asStateFlow()
 
-    fun addToCart(product: ProductEntity, qty: Int) {
+    fun addToCart(product: ProductEntity, qty: Int, coupon: UserPDPCouponItem? = null) {
         val current = _cartItems.value.toMutableList()
         val existing = current.find { it.product.id == product.id }
         if (existing != null) {
             val index = current.indexOf(existing)
-            current[index] = existing.copy(qty = existing.qty + qty)
+            current[index] = existing.copy(qty = existing.qty + qty, appliedCoupon = coupon ?: existing.appliedCoupon)
         } else {
-            current.add(CartItem(product, qty))
+            current.add(CartItem(product, qty, coupon))
         }
         _cartItems.value = current
     }
@@ -65,6 +66,10 @@ class HomeViewModel @Inject constructor(
             else current[index] = item.copy(qty = newQty)
         }
         _cartItems.value = current
+    }
+
+    fun clearCart() {
+        _cartItems.value = emptyList()
     }
 
     fun addSampleIfEmpty() {

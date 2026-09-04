@@ -33,6 +33,7 @@ import coil.compose.AsyncImage
 import com.veeransh.aifashion.enterprise.data.local.entity.ProductEntity
 import com.veeransh.aifashion.enterprise.ui.theme.VeeranshTheme
 import com.veeransh.aifashion.enterprise.ui.viewmodel.HomeViewModel
+import com.veeransh.aifashion.enterprise.types.UserPDPCouponItem
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -50,8 +51,8 @@ fun UserPDPDetailScreen(
         UserPDPDetailContent(
             product = product,
             onBack = onBack,
-            onAddToCart = { p, finalPrice ->
-                // Logic to add to cart
+            onAddToCart = { p, coupon ->
+                viewModel.addToCart(p, 1, coupon)
             }
         )
     } else {
@@ -66,7 +67,7 @@ fun UserPDPDetailScreen(
 fun UserPDPDetailContent(
     product: ProductEntity,
     onBack: () -> Unit,
-    onAddToCart: (ProductEntity, Double) -> Unit
+    onAddToCart: (ProductEntity, UserPDPCouponItem?) -> Unit
 ) {
     val maroon = Color(0xFF7A0C20)
     val gold = Color(0xFFD4AF37)
@@ -89,6 +90,9 @@ fun UserPDPDetailContent(
     ).filter { allowedCouponCodes.contains(it.code) }
 
     var selectedCouponCode by remember { mutableStateOf("") }
+    val selectedCoupon = remember(selectedCouponCode) {
+        availableCoupons.find { it.code == selectedCouponCode }
+    }
     
     // Price Logic
     val basePrice = product.retailPrice.takeIf { it > 0 } ?: 1000.0
@@ -327,7 +331,7 @@ fun UserPDPDetailContent(
                     // ACTIONS
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
-                            onClick = { onAddToCart(product, finalPrice) },
+                            onClick = { onAddToCart(product, selectedCoupon) },
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp),
@@ -461,4 +465,5 @@ fun FlowRow(
     )
 }
 
-data class UserPDPCouponItem(val code: String, val discount: String, val type: String, val value: Double)
+
+

@@ -15,7 +15,9 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import com.veeransh.aifashion.enterprise.data.local.entity.ProductEntity
 import com.veeransh.aifashion.enterprise.ui.theme.VeeranshTheme
+import com.veeransh.aifashion.enterprise.ui.viewmodel.OrderState
 import com.veeransh.aifashion.enterprise.ui.screens.*
+import com.veeransh.aifashion.enterprise.types.*
 import com.veeransh.aifashion.enterprise.ui.admin.CODSettings
 import com.veeransh.aifashion.enterprise.ui.shop.StylePartnerDashboardContent
 import com.veeransh.aifashion.enterprise.data.local.entity.DealerWalletEntity
@@ -73,7 +75,7 @@ class ProductPreviewProvider : PreviewParameterProvider<List<ProductEntity>> {
 }
 
 fun sampleCartItems() = listOf(
-    CartCheckoutItem(
+    CartItem(
         product = ProductEntity(
             id = "1", name = "Banarasi Katan Rose Blush", sku = "BAN-001",
             retailPrice = 1000.0, category = "Silk", brand = "Veeransh",
@@ -257,8 +259,9 @@ fun CartCheckoutPreview() {
         VeeranshTheme {
             CartCheckoutContent(
                 cartItems = sampleCartItems(),
+                orderState = OrderState.Idle,
                 onNavigateBack = {},
-                onOrderPlaced = {}
+                onPlaceOrder = { _, _ -> }
             )
         }
     }

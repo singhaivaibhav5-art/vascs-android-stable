@@ -19,86 +19,96 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.veeransh.aifashion.enterprise.data.local.entity.ProductEntity
-import com.veeransh.aifashion.enterprise.ui.theme.VeeranshTheme
 import com.veeransh.aifashion.enterprise.ui.viewmodel.HomeViewModel
+import com.veeransh.aifashion.enterprise.ui.viewmodel.OrderViewModel
+import com.veeransh.aifashion.enterprise.ui.viewmodel.OrderState
 import com.veeransh.aifashion.enterprise.types.CartItem
+import com.veeransh.aifashion.enterprise.types.UserPDPCouponItem
+import com.veeransh.aifashion.enterprise.util.FinancialCalculator
+import com.veeransh.aifashion.enterprise.ui.components.OrderSuccessDialog
 import androidx.hilt.navigation.compose.hiltViewModel
+import java.text.SimpleDateFormat
+import java.util.*
 import kotlin.math.roundToInt
-
-// Local Data Model for mapping if needed, but we use CartItem now
-data class CartCheckoutItem(
-    val product: ProductEntity,
-    val qty: Int,
-    val appliedCoupon: UserPDPCouponItem? = null
-)
 
 @Composable
 fun CartCheckoutScreen(
     viewModel: HomeViewModel = hiltViewModel(),
+    orderViewModel: OrderViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
     onOrderPlaced: () -> Unit
 ) {
     val cartItems by viewModel.cartItems.collectAsState()
-    
-    // Map CartItem to CartCheckoutItem for this screen's specific UI needs if any
-    // For now keeping it simple
-    val checkoutItems = cartItems.map { CartCheckoutItem(it.product, it.qty) }
+    val orderState by orderViewModel.orderState.collectAsState()
+    var showSuccessDialog by remember { mutableStateOf<String?>(null) }
+    var lastTotal by remember { mutableDoubleStateOf(0.0) }
+
+    LaunchedEffect(orderState) {
+        if (orderState is OrderState.Success) {
+            val orderId = (orderState as OrderState.Success).orderId.toString()
+            showSuccessDialog = orderId
+            viewModel.clearCart()
+            orderViewModel.resetOrderState()
+        }
+    }
 
     CartCheckoutContent(
-        cartItems = checkoutItems,
+        cartItems = cartItems,
+        orderState = orderState,
         onNavigateBack = onNavigateBack,
-        onOrderPlaced = onOrderPlaced
+        onPlaceOrder = { total, cartCoupon ->
+             if (cartItems.isNotEmpty() && orderState !is OrderState.Loading) {
+                 lastTotal = total
+                 val timestamp = SimpleDateFormat("HHmmss", Locale.getDefault()).format(Date())
+                 val orderNumber = "ORD-2026-$timestamp-${(10..99).random()}"
+                 orderViewModel.placeOrder(orderNumber, cartItems, cartCoupon)
+             }
+        }
     )
+
+    if (showSuccessDialog != null) {
+        OrderSuccessDialog(
+            orderId = showSuccessDialog!!,
+            total = lastTotal,
+            onDismiss = { 
+                showSuccessDialog = null
+                onOrderPlaced() // Navigate home
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CartCheckoutContent(
-    cartItems: List<CartCheckoutItem>,
+    cartItems: List<CartItem>,
+    orderState: OrderState,
     onNavigateBack: () -> Unit,
-    onOrderPlaced: () -> Unit
+    onPlaceOrder: (Double, UserPDPCouponItem?) -> Unit
 ) {
     val maroon = Color(0xFF7A0C20)
-    val gold = Color(0xFFD4AF37)
     val brandBg = Color(0xFFFFFAFB)
     val brandBorder = Color(0xFFECECEC)
     val darkText = Color(0xFF2A1A1D)
 
     // Tier 2 - Cart Level Coupon State
-    var selectedTier2Coupon by remember { mutableStateOf<String?>(null) }
+    var selectedTier2CouponCode by remember { mutableStateOf<String?>(null) }
     val tier2Coupons = listOf(
         UserPDPCouponItem("EXTRA5", "5% Extra OFF", "PERCENT", 5.0),
         UserPDPCouponItem("OFFER500", "₹500 OFF", "FIXED", 500.0)
     )
-
-    // Calculations
-    val subtotalAfterTier1 = cartItems.sumOf { item ->
-        val base = item.product.retailPrice
-        val discount = when (item.appliedCoupon?.type) {
-            "PERCENT" -> (base * (item.appliedCoupon.value / 100.0))
-            "FIXED" -> item.appliedCoupon.value
-            else -> 0.0
-        }
-        (base - discount) * item.qty
+    val selectedTier2Coupon = remember(selectedTier2CouponCode) {
+        tier2Coupons.find { it.code == selectedTier2CouponCode }
     }
 
-    val tier2Discount = remember(selectedTier2Coupon, subtotalAfterTier1) {
-        val coupon = tier2Coupons.find { it.code == selectedTier2Coupon }
-        when (coupon?.type) {
-            "PERCENT" -> (subtotalAfterTier1 * (coupon.value / 100.0)).roundToInt().toDouble()
-            "FIXED" -> coupon.value
-            else -> 0.0
-        }
+    // Calculations using Authoritative Calculator
+    val calc = remember(cartItems, selectedTier2Coupon) {
+        FinancialCalculator.calculate(cartItems, selectedTier2Coupon)
     }
-
-    val totalBeforeGst = subtotalAfterTier1 - tier2Discount
-    val gst = (totalBeforeGst * 0.05).roundToInt().toDouble()
-    val finalNetTotal = totalBeforeGst + gst
 
     Scaffold(
         topBar = {
@@ -184,12 +194,12 @@ fun CartCheckoutContent(
                         Spacer(modifier = Modifier.height(16.dp))
                         
                         tier2Coupons.forEach { coupon ->
-                            val isSelected = selectedTier2Coupon == coupon.code
+                            val isSelected = selectedTier2CouponCode == coupon.code
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
-                                    .clickable { selectedTier2Coupon = if (isSelected) null else coupon.code },
+                                    .clickable { selectedTier2CouponCode = if (isSelected) null else coupon.code },
                                 color = if (isSelected) maroon.copy(alpha = 0.05f) else Color.Transparent,
                                 border = BorderStroke(1.dp, if (isSelected) maroon else brandBorder),
                                 shape = RoundedCornerShape(10.dp)
@@ -225,31 +235,39 @@ fun CartCheckoutContent(
                     Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("ORDER SUMMARY", fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
                         
-                        SummaryRow("Subtotal (T1 Applied)", "₹${subtotalAfterTier1.toInt()}")
-                        
-                        if (tier2Discount > 0) {
-                            SummaryRow("Cart Discount (${selectedTier2Coupon})", "-₹${tier2Discount.toInt()}", color = maroon)
+                        SummaryRow("Subtotal", "₹${calc.subtotal.toInt()}")
+                        if (calc.productDiscount > 0) {
+                            SummaryRow("Product Discounts", "-₹${calc.productDiscount.toInt()}", color = maroon)
                         }
                         
-                        SummaryRow("GST (5%)", "₹${gst.toInt()}")
+                        if (calc.cartDiscount > 0) {
+                            SummaryRow("Cart Discount (${selectedTier2CouponCode})", "-₹${calc.cartDiscount.toInt()}", color = maroon)
+                        }
+                        
+                        SummaryRow("Taxable Amount", "₹${calc.taxableAmount.toInt()}")
+                        SummaryRow("GST (5%)", "₹${calc.gstAmount.toInt()}")
                         
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = brandBorder)
                         
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text("NET TOTAL", fontSize = 16.sp, fontWeight = FontWeight.Black)
-                            Text("₹${finalNetTotal.toInt()}", fontSize = 24.sp, fontWeight = FontWeight.Black, color = maroon)
+                            Text("₹${calc.netAmount.toInt()}", fontSize = 24.sp, fontWeight = FontWeight.Black, color = maroon)
                         }
                         
                         Spacer(modifier = Modifier.height(12.dp))
                         
                         Button(
-                            onClick = onOrderPlaced,
+                            onClick = { onPlaceOrder(calc.netAmount, selectedTier2Coupon) },
                             modifier = Modifier.fillMaxWidth().height(52.dp),
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = maroon),
-                            enabled = cartItems.isNotEmpty()
+                            enabled = cartItems.isNotEmpty() && orderState !is OrderState.Loading
                         ) {
-                            Text("PROCEED TO PAY — ₹${finalNetTotal.toInt()}", fontWeight = FontWeight.Bold)
+                            if (orderState is OrderState.Loading) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                            } else {
+                                Text("PROCEED TO PAY — ₹${calc.netAmount.toInt()}", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -273,7 +291,7 @@ fun CartCheckoutContent(
 }
 
 @Composable
-fun CartItemCard(item: CartCheckoutItem, maroon: Color, border: Color, darkText: Color) {
+fun CartItemCard(item: CartItem, maroon: Color, border: Color, darkText: Color) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
@@ -297,8 +315,13 @@ fun CartItemCard(item: CartCheckoutItem, maroon: Color, border: Color, darkText:
             Column(modifier = Modifier.weight(1f)) {
                 Text(item.product.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = darkText)
                 if (item.appliedCoupon != null) {
+                    val itemDiscount = when (item.appliedCoupon.type) {
+                        "PERCENT" -> (item.product.retailPrice * (item.appliedCoupon.value / 100.0)).roundToInt().toDouble()
+                        "FIXED" -> item.appliedCoupon.value
+                        else -> 0.0
+                    }
                     Text(
-                        "${item.appliedCoupon.code} ${item.appliedCoupon.discount} applied • Sale ₹${item.product.retailPrice.toInt()} → ₹${(item.product.retailPrice - (if (item.appliedCoupon.type == "PERCENT") (item.product.retailPrice * (item.appliedCoupon.value / 100.0)) else item.appliedCoupon.value)).toInt()}",
+                        "${item.appliedCoupon.code} applied • Sale ₹${item.product.retailPrice.toInt()} → ₹${(item.product.retailPrice - itemDiscount).toInt()}",
                         fontSize = 10.sp,
                         color = Color.Gray.copy(alpha = 0.7f)
                     )
@@ -307,9 +330,12 @@ fun CartItemCard(item: CartCheckoutItem, maroon: Color, border: Color, darkText:
                 Spacer(modifier = Modifier.height(4.dp))
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val discountedPrice = if (item.appliedCoupon != null) {
-                        item.product.retailPrice - (if (item.appliedCoupon.type == "PERCENT") (item.product.retailPrice * (item.appliedCoupon.value / 100.0)) else item.appliedCoupon.value)
-                    } else item.product.retailPrice
+                    val itemDiscount = when (item.appliedCoupon?.type) {
+                        "PERCENT" -> (item.product.retailPrice * (item.appliedCoupon.value / 100.0)).roundToInt().toDouble()
+                        "FIXED" -> item.appliedCoupon.value
+                        else -> 0.0
+                    }
+                    val discountedPrice = item.product.retailPrice - itemDiscount
                     
                     Text("₹${discountedPrice.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = darkText)
                     if (item.appliedCoupon != null) {
@@ -324,16 +350,20 @@ fun CartItemCard(item: CartCheckoutItem, maroon: Color, border: Color, darkText:
                 }
             }
             
-            // Quantity & Dropdown mockup
             Column(horizontalAlignment = Alignment.End) {
-                Surface(
-                    border = BorderStroke(1.dp, border),
-                    shape = RoundedCornerShape(6.dp),
-                    color = Color.White
-                ) {
-                    Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(item.appliedCoupon?.code ?: "Change Coupon", fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                        Icon(Icons.Default.ArrowDropDown, null, modifier = Modifier.size(14.dp), tint = Color.Gray)
+                if (item.appliedCoupon != null) {
+                    Surface(
+                        border = BorderStroke(1.dp, border),
+                        shape = RoundedCornerShape(6.dp),
+                        color = maroon.copy(alpha = 0.1f)
+                    ) {
+                        Text(
+                            item.appliedCoupon.code, 
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            fontSize = 9.sp, 
+                            fontWeight = FontWeight.Bold,
+                            color = maroon
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))

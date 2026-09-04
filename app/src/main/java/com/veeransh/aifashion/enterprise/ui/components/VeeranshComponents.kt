@@ -28,10 +28,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.veeransh.aifashion.enterprise.R
 import com.veeransh.aifashion.enterprise.data.local.entity.ProductEntity
 import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -314,6 +317,44 @@ fun SareeGridItem(
                     .align(Alignment.TopStart)
             ) {
                 Text("MOQ: 5", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+fun OrderSuccessDialog(orderId: String, total: Double, onDismiss: () -> Unit) {
+    val date = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date())
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(24.dp), color = Color.White) {
+            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(64.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Order Placed Successfully", fontWeight = FontWeight.Black, fontSize = 18.sp)
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Column(modifier = Modifier.fillMaxWidth().background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp)).padding(16.dp)) {
+                    Text("Order ID: $orderId", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("Date: $date", fontSize = 12.sp, color = Color.Gray)
+                    Text("Total Amount: ₹${total.toInt()}", fontWeight = FontWeight.Black, color = Color(0xFF0D5C36), fontSize = 16.sp)
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                        Text("Close")
+                    }
+                    Button(
+                        onClick = {},
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D5C36))
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Share")
+                    }
+                }
             }
         }
     }

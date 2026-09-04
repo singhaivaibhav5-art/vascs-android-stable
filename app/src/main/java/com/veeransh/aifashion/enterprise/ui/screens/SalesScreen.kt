@@ -19,7 +19,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.veeransh.aifashion.enterprise.data.local.entity.ProductEntity
 import com.veeransh.aifashion.enterprise.ui.viewmodel.HomeViewModel
+import com.veeransh.aifashion.enterprise.ui.viewmodel.OrderViewModel
+import com.veeransh.aifashion.enterprise.ui.viewmodel.OrderState
 import com.veeransh.aifashion.enterprise.types.CartItem
+import com.veeransh.aifashion.enterprise.util.FinancialCalculator
+import com.veeransh.aifashion.enterprise.ui.components.OrderSuccessDialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -27,16 +31,30 @@ import java.util.*
 @Composable
 fun SalesScreen(
     viewModel: HomeViewModel = hiltViewModel(),
-    onGenerateBill: (String, List<CartItem>, Double) -> Unit,
+    orderViewModel: OrderViewModel = hiltViewModel(),
     snackbarHostState: SnackbarHostState
 ) {
     val products by viewModel.products.collectAsState()
     val cartItems by viewModel.cartItems.collectAsState()
+    val orderState by orderViewModel.orderState.collectAsState()
+    
     var showSuccessDialog by remember { mutableStateOf<String?>(null) }
     
-    val subtotal = cartItems.sumOf { it.product.retailPrice * it.qty }
-    val gst = subtotal * 0.05
-    val total = subtotal + gst
+    val calc = remember(cartItems) {
+        FinancialCalculator.calculate(cartItems, null)
+    }
+
+    LaunchedEffect(orderState) {
+        if (orderState is OrderState.Success) {
+            val orderId = (orderState as OrderState.Success).orderId.toString()
+            showSuccessDialog = orderId
+            viewModel.clearCart()
+            orderViewModel.resetOrderState()
+        } else if (orderState is OrderState.Error) {
+            snackbarHostState.showSnackbar("Error: ${(orderState as OrderState.Error).message}")
+            orderViewModel.resetOrderState()
+        }
+    }
 
     Row(modifier = Modifier.fillMaxSize().background(Color(0xFFF5F1E8))) {
         // Left: Product List
@@ -102,28 +120,32 @@ fun SalesScreen(
             Spacer(modifier = Modifier.height(16.dp))
             
             // Calculations
-            BillRow("Subtotal", "₹$subtotal")
-            BillRow("GST (5%)", "₹$gst")
+            BillRow("Subtotal", "₹${calc.subtotal.toInt()}")
+            BillRow("Taxable Amount", "₹${calc.taxableAmount.toInt()}")
+            BillRow("GST (5%)", "₹${calc.gstAmount.toInt()}")
             Spacer(modifier = Modifier.height(8.dp))
-            BillRow("NET TOTAL", "₹$total", isTotal = true)
+            BillRow("NET TOTAL", "₹${calc.netAmount.toInt()}", isTotal = true)
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = {
-                    if (cartItems.isNotEmpty()) {
-                        val orderId = "ORD-2026-${(1000..9999).random()}"
-                        onGenerateBill(orderId, cartItems, total)
-                        showSuccessDialog = orderId
-                        // Note: In a real app, clear cart after order success
+                    if (cartItems.isNotEmpty() && orderState !is OrderState.Loading) {
+                        val timestamp = SimpleDateFormat("HHmmss", Locale.getDefault()).format(Date())
+                        val orderNumber = "ORD-2026-$timestamp-${(10..99).random()}"
+                        orderViewModel.placeOrder(orderNumber, cartItems, null)
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D5C36)),
                 shape = RoundedCornerShape(12.dp),
-                enabled = cartItems.isNotEmpty()
+                enabled = cartItems.isNotEmpty() && orderState !is OrderState.Loading
             ) {
-                Text("GENERATE BILL", fontWeight = FontWeight.Black)
+                if (orderState is OrderState.Loading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
+                } else {
+                    Text("GENERATE BILL", fontWeight = FontWeight.Black)
+                }
             }
         }
     }
@@ -131,7 +153,7 @@ fun SalesScreen(
     if (showSuccessDialog != null) {
         OrderSuccessDialog(
             orderId = showSuccessDialog!!,
-            total = total,
+            total = calc.netAmount,
             onDismiss = { showSuccessDialog = null }
         )
     }
@@ -204,40 +226,5 @@ fun BillRow(label: String, value: String, isTotal: Boolean = false) {
     }
 }
 
-@Composable
-fun OrderSuccessDialog(orderId: String, total: Double, onDismiss: () -> Unit) {
-    val date = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault()).format(Date())
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(24.dp), color = Color.White) {
-            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(64.dp))
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Order Placed Successfully", fontWeight = FontWeight.Black, fontSize = 18.sp)
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                Column(modifier = Modifier.fillMaxWidth().background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp)).padding(16.dp)) {
-                    Text("Order ID: $orderId", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text("Date: $date", fontSize = 12.sp, color = Color.Gray)
-                    Text("Total Amount: ₹$total", fontWeight = FontWeight.Black, color = Color(0xFF0D5C36), fontSize = 16.sp)
-                }
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
-                        Text("Close")
-                    }
-                    Button(
-                        onClick = {},
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D5C36))
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Share")
-                    }
-                }
-            }
-        }
-    }
-}
+
+

@@ -35,7 +35,6 @@ import com.veeransh.aifashion.enterprise.data.local.entity.OrderItemEntity
 import com.veeransh.aifashion.enterprise.data.local.entity.OrderMasterEntity
 import com.veeransh.aifashion.enterprise.types.CartItem
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
 fun MainScreen(
@@ -57,44 +56,10 @@ fun MainScreen(
         orders = orders,
         onAdminPinSuccess = { isAdmin = true },
         onLogout = { isAdmin = false },
-        onUpdateStock = { id, newStock -> 
-            // Stock update handled via ViewModel in specific screens now
-        },
         onSaveProduct = { product -> homeViewModel.saveProduct(product) },
         homeViewModel = homeViewModel,
         orderViewModel = orderViewModel,
-        walletViewModel = walletViewModel,
-        onCreateOrder = { orderId, items, total ->
-            val order = OrderMasterEntity(
-                orderNumber = orderId,
-                dealerId = "DLR-001",
-                dealerName = "Self Retail",
-                mobile = "9876543210",
-                whatsapp = "9876543210",
-                orderDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date()),
-                totalItems = items.size,
-                totalQty = items.sumOf { it.qty },
-                totalAmount = total,
-                gstAmount = total * 0.05,
-                netAmount = total * 1.05,
-                createdDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date()),
-                updatedDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
-            )
-            val orderItems = items.map { item ->
-                OrderItemEntity(
-                    orderId = 0L,
-                    productId = item.product.id,
-                    productName = item.product.name,
-                    sku = item.product.sku,
-                    qty = item.qty,
-                    rate = item.product.retailPrice,
-                    amount = item.product.retailPrice * item.qty,
-                    gst = (item.product.retailPrice * item.qty) * 0.05,
-                    netAmount = (item.product.retailPrice * item.qty) * 1.05
-                )
-            }
-            orderViewModel.createOrder(order, orderItems)
-        }
+        walletViewModel = walletViewModel
     )
 }
 
@@ -106,9 +71,7 @@ fun MainScreenContent(
     orders: List<OrderMasterEntity>,
     onAdminPinSuccess: () -> Unit,
     onLogout: () -> Unit,
-    onUpdateStock: (String, Int) -> Unit,
     onSaveProduct: (ProductEntity) -> Unit,
-    onCreateOrder: (String, List<CartItem>, Double) -> Unit,
     homeViewModel: HomeViewModel? = null,
     orderViewModel: OrderViewModel? = null,
     walletViewModel: WalletViewModel? = null
@@ -243,9 +206,10 @@ fun MainScreenContent(
                         }
                     }
                     composable("cart") {
-                        if (homeViewModel != null) {
+                        if (homeViewModel != null && orderViewModel != null) {
                             CartCheckoutScreen(
                                 viewModel = homeViewModel,
+                                orderViewModel = orderViewModel,
                                 onNavigateBack = { navController.popBackStack() },
                                 onOrderPlaced = {
                                     navController.navigate("home")
@@ -265,19 +229,11 @@ fun MainScreenContent(
                         }
                     }
                     composable("sales") { 
-                        if (homeViewModel != null) {
+                        if (homeViewModel != null && orderViewModel != null) {
                             SalesScreen(
                                 viewModel = homeViewModel,
-                                snackbarHostState = snackbarHostState,
-                                onGenerateBill = { orderId, cartItems, total ->
-                                    onCreateOrder(orderId, cartItems, total)
-                                    cartItems.forEach { item ->
-                                        onUpdateStock(item.product.id, item.product.stock - item.qty)
-                                    }
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("Order $orderId created successfully")
-                                    }
-                                }
+                                orderViewModel = orderViewModel,
+                                snackbarHostState = snackbarHostState
                             )
                         }
                     }

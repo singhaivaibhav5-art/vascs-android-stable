@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VEERANSH AI Fashion</string>
+    <string name="app_subtitle">The Saree Destination - ERP ULTIMA</string>
+    <string name="brand_slogan">Tradition Meets Intelligence</string>
+
+    <!-- Branding Labels -->
+    <string name="label_style_partner">Style Partner</string>
+    <string name="label_sales_manager">Sales Manager</string>
+    <string name="label_qc_hub">Veeransh QC Hub</string>
+    <string name="label_packaging">Premium Packaging</string>
+</resources>

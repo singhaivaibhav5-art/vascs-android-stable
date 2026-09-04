@@ -1,0 +1,16 @@
+.gradle/
+.idea/
+build/
+app/build/
+local.properties
+*.iml
+*.apk
+*.aab
+*.zip
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Android generated metadata
+*.dm
+output-metadata.json

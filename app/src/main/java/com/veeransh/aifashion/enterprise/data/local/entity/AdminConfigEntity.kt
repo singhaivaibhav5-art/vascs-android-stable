@@ -20,6 +20,7 @@ data class AdminConfigEntity(
     val cartCouponDiscount: Int = 10,
     val pincodesJson: String = "[]",
     val premiumDealsJson: String = "[]",
+    val templatesJson: String = "[]",
     val otpOnly: Boolean = true,
     val noReturn: Boolean = true,
     val bananaAiEnabled: Boolean = true,

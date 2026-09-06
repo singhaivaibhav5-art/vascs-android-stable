@@ -32,6 +32,8 @@ import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.veeransh.aifashion.enterprise.R
 import com.veeransh.aifashion.enterprise.data.local.entity.ProductEntity
+import com.veeransh.aifashion.enterprise.data.local.entity.PlacementEntity
+import com.veeransh.aifashion.enterprise.ui.viewmodel.PlacementWithProduct
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
@@ -162,8 +164,114 @@ fun CategoryChips(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BannerSlider(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    placements: List<PlacementWithProduct> = emptyList(),
+    onProductClick: (ProductEntity) -> Unit = {}
 ) {
+    if (placements.isEmpty()) {
+        LegacyBannerSlider(modifier)
+    } else {
+        val pagerState = rememberPagerState(pageCount = { placements.size })
+
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(4000)
+                if (placements.isNotEmpty()) {
+                    val nextPage = (pagerState.currentPage + 1) % placements.size
+                    pagerState.animateScrollToPage(nextPage)
+                }
+            }
+        }
+
+        Column(modifier = modifier) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f) // Standard for banners
+                    .clip(RoundedCornerShape(20.dp))
+            ) { page ->
+                val pw = placements[page]
+                val placement = pw.placement
+                val product = pw.product
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable { onProductClick(product) }
+                ) {
+                    AsyncImage(
+                        model = if (placement.imageUri.isNotBlank()) placement.imageUri else product.image,
+                        contentDescription = placement.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = when (placement.cropMode) {
+                            "CenterCrop" -> ContentScale.Crop
+                            "Fit" -> ContentScale.Fit
+                            "FillBounds" -> ContentScale.FillBounds
+                            else -> ContentScale.Crop
+                        }
+                    )
+                    
+                    // Banner Content Overlay
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f))
+                            .padding(24.dp)
+                    ) {
+                        Column(modifier = Modifier.align(Alignment.BottomStart)) {
+                            if (placement.title.isNotBlank()) {
+                                Text(
+                                    text = placement.title,
+                                    color = Color.White,
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+                            Text(
+                                text = product.name,
+                                color = Color(0xFFE9C46A),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = { onProductClick(product) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
+                            ) {
+                                Text("View Saree", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                repeat(placements.size) { iteration ->
+                    val color = if (pagerState.currentPage == iteration) Color(0xFF0A5C36) else Color.LightGray
+                    Box(
+                        modifier = Modifier
+                            .padding(2.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .size(8.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun LegacyBannerSlider(modifier: Modifier = Modifier) {
     val banners = listOf(
         BannerData("GRAND SAREE FESTIVAL", "Up to 70% OFF", Color(0xFF0A5C36)),
         BannerData("SILK SPECIAL", "Exclusive Banarasi", Color(0xFF5C4900)),

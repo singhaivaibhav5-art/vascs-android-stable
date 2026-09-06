@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -112,7 +113,7 @@ fun UserPDPDetailContent(
                 title = { Text("Product Details", style = TextStyle(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
@@ -120,302 +121,273 @@ fun UserPDPDetailContent(
         },
         containerColor = Color(0xFFFFFAFB)
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-        ) {
-            // MAIN LAYOUT: Grid-like 2 columns on large screens
-            Row(
+        BoxWithConstraints(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+            val isWide = maxWidth > 600.dp
+            
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalArrangement = Arrangement.spacedBy(32.dp)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
             ) {
-                // LEFT COLUMN (Fixed Width 480dp approx)
-                Column(modifier = Modifier.width(480.dp)) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(4f / 5f),
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, Color.White),
-                        colors = CardDefaults.cardColors(containerColor = lightBg),
-                        elevation = CardDefaults.cardElevation(4.dp)
-                    ) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            AsyncImage(
-                                model = product.image,
-                                contentDescription = product.name,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                            
-                            // Badges Row at bottom
-                            Row(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                BadgeBox("ID: ${product.id}")
-                                BadgeBox("SKU: ${product.sku}")
-                                BadgeBox("${product.size} • 4:5")
-                            }
-                        }
-                    }
+                if (isWide) {
+                    WidePDPLayout(product, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, { selectedCouponCode = it })
+                } else {
+                    MobilePDPLayout(product, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, { selectedCouponCode = it })
                 }
-
-                // RIGHT COLUMN
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                    // Title & Price Section
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, Color.White),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(2.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(24.dp)) {
-                            Text(
-                                text = "${product.category.uppercase()} • ${product.colour.uppercase()}",
-                                style = TextStyle(
-                                    fontSize = 12.sp,
-                                    letterSpacing = 2.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.Gray.copy(alpha = 0.6f)
-                                )
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = product.name,
-                                style = TextStyle(
-                                    fontFamily = FontFamily.Serif,
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    lineHeight = 32.sp
-                                ),
-                                color = darkText
-                            )
-                            Spacer(modifier = Modifier.height(20.dp))
-                            
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "₹${finalPrice.toInt()}",
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = darkText
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = "₹${basePrice.toInt()}",
-                                    fontSize = 14.sp,
-                                    textDecoration = TextDecoration.LineThrough,
-                                    color = Color.Gray.copy(alpha = 0.4f)
-                                )
-                                if (discountValue > 0) {
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Surface(
-                                        color = lightMaroon,
-                                        border = BorderStroke(1.dp, borderMaroon),
-                                        shape = RoundedCornerShape(4.dp)
-                                    ) {
-                                        Text(
-                                            "Save ₹${discountValue.toInt()}",
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = maroon
-                                        )
-                                    }
-                                }
-                            }
-                            
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                "Inclusive of taxes • Well Packed • No Return/No Exchange except defect 24h",
-                                fontSize = 11.sp,
-                                color = Color.Gray.copy(alpha = 0.6f)
-                            )
-                        }
-                    }
-
-                    // COUPON TIER 1 LOGIC
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, brandBorder),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFafB))
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Percent, null, modifier = Modifier.size(14.dp), tint = maroon)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Available Offers (Product-Level) • Tick to Apply", fontSize = 13.sp, fontWeight = FontWeight.Black, color = darkText)
-                            }
-                            
-                            Spacer(modifier = Modifier.height(16.dp))
-                            
-                            if (availableCoupons.isEmpty()) {
-                                Text(
-                                    "No coupons allowed for this product (admin unchecked all).",
-                                    fontSize = 11.sp,
-                                    color = Color.Gray.copy(alpha = 0.6f),
-                                    modifier = Modifier.padding(vertical = 8.dp)
-                                )
-                            } else {
-                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    availableCoupons.forEach { coupon ->
-                                        val isSelected = selectedCouponCode == coupon.code
-                                        val saving = if (coupon.type == "PERCENT") (basePrice * (coupon.value / 100.0)).roundToInt() else coupon.value.toInt()
-                                        
-                                        Surface(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clickable { selectedCouponCode = if (isSelected) "" else coupon.code },
-                                            color = if (isSelected) maroon else Color.White,
-                                            border = BorderStroke(1.dp, if (isSelected) maroon else borderMaroon),
-                                            shape = RoundedCornerShape(12.dp)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Checkbox(
-                                                    checked = isSelected,
-                                                    onCheckedChange = null,
-                                                    colors = CheckboxDefaults.colors(
-                                                        checkedColor = gold,
-                                                        uncheckedColor = Color.LightGray
-                                                    ),
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                                Spacer(modifier = Modifier.width(8.dp))
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        coupon.code,
-                                                        fontSize = 11.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = if (isSelected) Color.White else darkText
-                                                    )
-                                                    Text(
-                                                        "${coupon.discount} — Save ₹$saving",
-                                                        fontSize = 10.sp,
-                                                        color = if (isSelected) Color.White.copy(alpha = 0.8f) else maroon
-                                                    )
-                                                }
-                                                if (isSelected) {
-                                                    Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp), tint = Color.White)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Info, null, modifier = Modifier.size(12.dp), tint = Color.Gray.copy(alpha = 0.7f))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    "Price animates: ₹${basePrice.toInt()} line-through → ₹${finalPrice.toInt()} when ticked. Add to Cart shows ₹${finalPrice.toInt()}.",
-                                    fontSize = 11.sp,
-                                    color = Color.Gray.copy(alpha = 0.7f)
-                                )
-                            }
-                        }
-                    }
-
-                    // ACTIONS
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(
-                            onClick = { onAddToCart(product, selectedCoupon) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(48.dp),
-                            shape = RoundedCornerShape(24.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = maroon)
-                        ) {
-                            Text("Add to Cart — ₹${finalPrice.toInt()}", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                        }
-                        
-                        OutlinedButton(
-                            onClick = {},
-                            modifier = Modifier.size(48.dp),
-                            shape = CircleShape,
-                            contentPadding = PaddingValues(0.dp),
-                            border = BorderStroke(1.dp, brandBorder)
-                        ) {
-                            Icon(Icons.Default.ShoppingBag, contentDescription = "Bag", modifier = Modifier.size(18.dp), tint = darkText)
-                        }
-                    }
-
-                    // Features Grid
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(lightBg, RoundedCornerShape(12.dp))
-                            .border(1.dp, borderMaroon.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        FeatureItem(Icons.Default.Inventory2, "Well Packed")
-                        FeatureItem(Icons.Default.QrCode, "QR Verified")
-                        FeatureItem(Icons.Default.VerifiedUser, "QC Hub")
-                    }
-                }
-            }
-
-            // INFO FOOTER
-            Surface(
-                modifier = Modifier
-                    .padding(horizontal = 24.dp)
-                    .fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, Color.White),
-                color = Color.White.copy(alpha = 0.5f)
-            ) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(16.dp), tint = maroon)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        "Ratio auto applied per location: Home Banner 16:9 900x506, Grid 4:5 800x1000, Ad 1:1 800x800. Admin checked productGrid, homeBanner → auto crops preview.",
-                        fontSize = 11.sp,
-                        color = Color.Gray.copy(alpha = 0.8f)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // BOTTOM BAR
-            Surface(
-                modifier = Modifier
-                    .padding(horizontal = 24.dp, vertical = 24.dp)
-                    .fillMaxWidth(),
-                color = maroon,
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                FlowRow(
-                    modifier = Modifier.padding(20.dp),
-                    mainAxisSpacing = 16.dp,
-                    crossAxisSpacing = 12.dp
+                
+                // INFO FOOTER
+                Surface(
+                    modifier = Modifier
+                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                        .fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, Color.White),
+                    color = Color.White.copy(alpha = 0.5f)
                 ) {
-                    MetaItem("Product ID", product.id)
-                    MetaItem("SKU", product.sku)
-                    MetaItem("QR", "VERIFIED")
-                    MetaItem("Size", product.size)
-                    MetaItem("Ratio", "4:5")
-                    MetaItem("Fit", "Cover")
-                    MetaItem("Stock", "${product.stock}")
-                    MetaItem("Display", product.location.replace("|", ", "))
+                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(16.dp), tint = maroon)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            "Ratio auto applied per location: Home Banner 16:9 900x506, Grid 4:5 800x1000, Ad 1:1 800x800. Admin checked productGrid, homeBanner → auto crops preview.",
+                            fontSize = 11.sp,
+                            color = Color.Gray.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // BOTTOM BAR
+                Surface(
+                    modifier = Modifier
+                        .padding(horizontal = 24.dp, vertical = 24.dp)
+                        .fillMaxWidth(),
+                    color = maroon,
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    FlowRow(
+                        modifier = Modifier.padding(20.dp),
+                        mainAxisSpacing = 16.dp,
+                        crossAxisSpacing = 12.dp
+                    ) {
+                        MetaItem("Product ID", product.id)
+                        MetaItem("SKU", product.sku)
+                        MetaItem("QR", "VERIFIED")
+                        MetaItem("Size", product.size)
+                        MetaItem("Ratio", "4:5")
+                        MetaItem("Fit", "Cover")
+                        MetaItem("Stock", "${product.stock}")
+                        MetaItem("Display", product.location.replace("|", ", "))
+                    }
                 }
             }
         }
     }
 }
+
+@Composable
+fun MobilePDPLayout(
+    product: ProductEntity,
+    basePrice: Double,
+    finalPrice: Double,
+    discountValue: Double,
+    availableCoupons: List<UserPDPCouponItem>,
+    selectedCouponCode: String,
+    selectedCoupon: UserPDPCouponItem?,
+    maroon: Color,
+    gold: Color,
+    lightBg: Color,
+    lightMaroon: Color,
+    borderMaroon: Color,
+    brandBorder: Color,
+    darkText: Color,
+    onAddToCart: (ProductEntity, UserPDPCouponItem?) -> Unit,
+    onCouponSelect: (String) -> Unit
+) {
+    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Image
+        Card(
+            modifier = Modifier.fillMaxWidth().aspectRatio(4f / 5f),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(4.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(model = product.image, contentDescription = product.name, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                Row(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BadgeBox("SKU: ${product.sku}")
+                    BadgeBox("${product.size}")
+                }
+            }
+        }
+        
+        // Content
+        PDPContentSection(product, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, onCouponSelect)
+    }
+}
+
+@Composable
+fun WidePDPLayout(
+    product: ProductEntity,
+    basePrice: Double,
+    finalPrice: Double,
+    discountValue: Double,
+    availableCoupons: List<UserPDPCouponItem>,
+    selectedCouponCode: String,
+    selectedCoupon: UserPDPCouponItem?,
+    maroon: Color,
+    gold: Color,
+    lightBg: Color,
+    lightMaroon: Color,
+    borderMaroon: Color,
+    brandBorder: Color,
+    darkText: Color,
+    onAddToCart: (ProductEntity, UserPDPCouponItem?) -> Unit,
+    onCouponSelect: (String) -> Unit
+) {
+    Row(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+        Column(modifier = Modifier.width(400.dp)) {
+            Card(modifier = Modifier.fillMaxWidth().aspectRatio(4f / 5f), shape = RoundedCornerShape(20.dp), elevation = CardDefaults.cardElevation(4.dp)) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AsyncImage(model = product.image, contentDescription = product.name, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                }
+            }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            PDPContentSection(product, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, onCouponSelect)
+        }
+    }
+}
+
+@Composable
+fun PDPContentSection(
+    product: ProductEntity,
+    basePrice: Double,
+    finalPrice: Double,
+    discountValue: Double,
+    availableCoupons: List<UserPDPCouponItem>,
+    selectedCouponCode: String,
+    selectedCoupon: UserPDPCouponItem?,
+    maroon: Color,
+    gold: Color,
+    lightBg: Color,
+    lightMaroon: Color,
+    borderMaroon: Color,
+    brandBorder: Color,
+    darkText: Color,
+    onAddToCart: (ProductEntity, UserPDPCouponItem?) -> Unit,
+    onCouponSelect: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
+        // Title & Price Section
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, Color.White),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(2.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(
+                    text = "${product.category.uppercase()} • ${product.colour.uppercase()}",
+                    style = TextStyle(fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold, color = Color.Gray.copy(alpha = 0.6f))
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = product.name,
+                    style = TextStyle(fontFamily = FontFamily.Serif, fontSize = 28.sp, fontWeight = FontWeight.Bold, lineHeight = 32.sp),
+                    color = darkText
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "₹${finalPrice.toInt()}", fontSize = 28.sp, fontWeight = FontWeight.SemiBold, color = darkText)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(text = "₹${basePrice.toInt()}", fontSize = 14.sp, textDecoration = TextDecoration.LineThrough, color = Color.Gray.copy(alpha = 0.4f))
+                    if (discountValue > 0) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Surface(color = lightMaroon, border = BorderStroke(1.dp, borderMaroon), shape = RoundedCornerShape(4.dp)) {
+                            Text("Save ₹${discountValue.toInt()}", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = maroon)
+                        }
+                    }
+                }
+            }
+        }
+
+        // COUPON TIER 1 LOGIC
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, brandBorder),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFafB))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Percent, null, modifier = Modifier.size(14.dp), tint = maroon)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Available Offers", fontSize = 13.sp, fontWeight = FontWeight.Black, color = darkText)
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    availableCoupons.forEach { coupon ->
+                        val isSelected = selectedCouponCode == coupon.code
+                        val saving = if (coupon.type == "PERCENT") (basePrice * (coupon.value / 100.0)).roundToInt() else coupon.value.toInt()
+                        
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clickable { onCouponSelect(if (isSelected) "" else coupon.code) },
+                            color = if (isSelected) maroon else Color.White,
+                            border = BorderStroke(1.dp, if (isSelected) maroon else borderMaroon),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = isSelected, onCheckedChange = null, colors = CheckboxDefaults.colors(checkedColor = gold, uncheckedColor = Color.LightGray), modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(coupon.code, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isSelected) Color.White else darkText)
+                                    Text("${coupon.discount} — Save ₹$saving", fontSize = 10.sp, color = if (isSelected) Color.White.copy(alpha = 0.8f) else maroon)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ACTIONS
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                onClick = { onAddToCart(product, selectedCoupon) },
+                modifier = Modifier.weight(1f).height(48.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = maroon)
+            ) {
+                Text("Add to Cart — ₹${finalPrice.toInt()}", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+            
+            OutlinedButton(
+                onClick = {},
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                contentPadding = PaddingValues(0.dp),
+                border = BorderStroke(1.dp, brandBorder)
+            ) {
+                Icon(Icons.Default.ShoppingBag, contentDescription = "Bag", modifier = Modifier.size(18.dp), tint = darkText)
+            }
+        }
+
+        // Features Grid
+        Row(
+            modifier = Modifier.fillMaxWidth().background(lightBg, RoundedCornerShape(12.dp)).border(1.dp, borderMaroon.copy(alpha = 0.3f), RoundedCornerShape(12.dp)).padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            FeatureItem(Icons.Default.Inventory2, "Well Packed")
+            FeatureItem(Icons.Default.QrCode, "QR Verified")
+            FeatureItem(Icons.Default.VerifiedUser, "QC Hub")
+        }
+    }
+}
+
 
 @Composable
 fun BadgeBox(text: String) {

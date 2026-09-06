@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,6 +25,11 @@ import androidx.navigation.NavController
 import kotlinx.coroutines.launch
 import com.veeransh.aifashion.enterprise.data.local.entity.ProductEntity
 import com.veeransh.aifashion.enterprise.ui.viewmodel.SuperAdminViewModel
+import com.veeransh.aifashion.enterprise.types.PlacementConstants
+import com.veeransh.aifashion.enterprise.types.PlacementTemplate
+import com.veeransh.aifashion.enterprise.types.DefaultTemplates
+import com.veeransh.aifashion.enterprise.util.PlacementTemplateHelper
+import com.veeransh.aifashion.enterprise.ui.studio.PlacementDropdown
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,11 +43,11 @@ fun SuperAdminDashboard(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // FINAL 15 TABS - As per VASCS MASTER Blueprint
+    // FINAL 16 TABS - Added Templates for Phase 2.6.3
     val tabs = listOf(
         "Login", "PIN", "Roles", "Users", "Perms", 
-        "COD", "Payment", "Display", "Coupon", "Pincode", 
-        "Return", "AI", "B2B", "System", "Logs"
+        "COD", "Payment", "Display", "Templates", "Coupon", 
+        "Pincode", "Return", "AI", "B2B", "System", "Logs"
     )
 
     Scaffold(
@@ -130,13 +136,14 @@ fun SuperAdminDashboard(
                         5 -> CODTab(viewModel, snackbarHostState)
                         6 -> PaymentTab()
                         7 -> DisplayTab(viewModel)
-                        8 -> CouponTab(snackbarHostState)
-                        9 -> PincodeTab(snackbarHostState)
-                        10 -> ReturnTab()
-                        11 -> AITab(viewModel)
-                        12 -> B2BTab()
-                        13 -> SystemTab(viewModel, snackbarHostState)
-                        14 -> LogsTab(viewModel)
+                        8 -> TemplatesTab(viewModel, snackbarHostState)
+                        9 -> CouponTab(snackbarHostState)
+                        10 -> PincodeTab(snackbarHostState)
+                        11 -> ReturnTab()
+                        12 -> AITab(viewModel)
+                        13 -> B2BTab()
+                        14 -> SystemTab(viewModel, snackbarHostState)
+                        15 -> LogsTab(viewModel)
                     }
                 }
             }
@@ -144,7 +151,7 @@ fun SuperAdminDashboard(
     }
 }
 
-// TAB 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14 implementations
+// TAB implementations
 @Composable fun AdminLoginTab(isUnlocked: Boolean) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center){ Text(if(isUnlocked) "✓ Unlocked as Super Admin (PIN 2026)" else "Locked", color = Color(0xFF0D5C36), fontWeight = FontWeight.Bold) } }
 
 @Composable
@@ -245,6 +252,178 @@ fun CODTab(viewModel: SuperAdminViewModel, snackbarHostState: SnackbarHostState)
 @Composable fun DisplayTab(viewModel: SuperAdminViewModel) {
     val products by viewModel.products.collectAsState()
     LazyColumn { items(products) { p -> Card(modifier = Modifier.padding(8.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Color.White)){ Row(modifier = Modifier.padding(16.dp)){ Column(modifier = Modifier.weight(1f)){ Text(p.name, fontWeight = FontWeight.Bold); Text("SKU: ${p.sku} | Stock: ${p.stock}") } } } } }
+}
+
+@Composable
+fun TemplatesTab(viewModel: SuperAdminViewModel, snackbarHostState: SnackbarHostState) {
+    val config by viewModel.adminConfig.collectAsState()
+    val scope = rememberCoroutineScope()
+    var editingTemplate by remember { mutableStateOf<PlacementTemplate?>(null) }
+    var showResetAllConfirm by remember { mutableStateOf(false) }
+
+    val templates = remember(config?.templatesJson) {
+        PlacementTemplateHelper.parseTemplates(config?.templatesJson ?: "[]")
+    }
+
+    // Ensure we show all types even if missing from JSON
+    val displayTemplates = remember(templates) {
+        PlacementConstants.TYPES.map { type ->
+            templates.find { it.placementType == type.machineValue }
+                ?: DefaultTemplates.DEFAULTS.find { it.placementType == type.machineValue }
+                ?: DefaultTemplates.DEFAULTS.first()
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Placement Templates", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = Color(0xFF0D5C36))
+            Button(
+                onClick = { showResetAllConfirm = true },
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+            ) {
+                Text("Reset All", fontSize = 12.sp)
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(displayTemplates) { template ->
+                TemplateCard(
+                    template = template,
+                    onEdit = { editingTemplate = template },
+                    onReset = {
+                        val dflt = DefaultTemplates.DEFAULTS.find { it.placementType == template.placementType }
+                        if (dflt != null) {
+                            viewModel.updatePlacementTemplate(dflt)
+                            scope.launch { snackbarHostState.showSnackbar("Reset ${template.placementType} to default") }
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    if (editingTemplate != null) {
+        TemplateEditDialog(
+            template = editingTemplate!!,
+            onDismiss = { editingTemplate = null },
+            onSave = { 
+                viewModel.updatePlacementTemplate(it)
+                editingTemplate = null
+                scope.launch { snackbarHostState.showSnackbar("Template Updated") }
+            }
+        )
+    }
+
+    if (showResetAllConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetAllConfirm = false },
+            title = { Text("Reset All Templates?") },
+            text = { Text("This will restore all placement standards to default. Continue?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.resetAllTemplates(DefaultTemplates.getSerializedDefaults())
+                    showResetAllConfirm = false
+                    scope.launch { snackbarHostState.showSnackbar("All templates reset to defaults") }
+                }) { Text("Reset All", color = Color.Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetAllConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+fun TemplateCard(template: PlacementTemplate, onEdit: () -> Unit, onReset: () -> Unit) {
+    val displayName = PlacementConstants.TYPES.find { it.machineValue == template.placementType }?.displayName ?: template.placementType
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFECECEC))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                Column {
+                    Text(displayName.uppercase(), fontWeight = FontWeight.Black, fontSize = 13.sp, color = Color(0xFF7A0C20))
+                    Text(template.placementType, fontSize = 10.sp, color = Color.Gray)
+                }
+                IconButton(onClick = onReset, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Refresh, null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                TemplateInfoItem("Ratio", template.aspectRatio, Modifier.weight(1f))
+                TemplateInfoItem("Target Size", "${template.targetWidthPx}×${template.targetHeightPx}", Modifier.weight(1f))
+                TemplateInfoItem("Crop", template.cropMode, Modifier.weight(1f))
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            OutlinedButton(
+                onClick = onEdit,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0D5C36))
+            ) {
+                Text("Edit Template", color = Color(0xFF0D5C36))
+            }
+        }
+    }
+}
+
+@Composable
+fun TemplateInfoItem(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(label, fontSize = 9.sp, color = Color.Gray)
+        Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun TemplateEditDialog(template: PlacementTemplate, onDismiss: () -> Unit, onSave: (PlacementTemplate) -> Unit) {
+    var ratio by remember { mutableStateOf(template.aspectRatio) }
+    var crop by remember { mutableStateOf(template.cropMode) }
+    var width by remember { mutableStateOf(template.targetWidthPx.toString()) }
+    var height by remember { mutableStateOf(template.targetHeightPx.toString()) }
+
+    val displayName = PlacementConstants.TYPES.find { it.machineValue == template.placementType }?.displayName ?: template.placementType
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Standard: $displayName") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                PlacementDropdown("Aspect Ratio", ratio, PlacementConstants.ASPECT_RATIOS.map { it to it }, { ratio = it })
+                PlacementDropdown("Crop Mode", crop, PlacementConstants.CROP_MODES.map { it to it }, { crop = it })
+                
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = width, onValueChange = { width = it }, label = { Text("Width Px") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    OutlinedTextField(value = height, onValueChange = { height = it }, label = { Text("Height Px") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val w = width.toIntOrNull() ?: 0
+                    val h = height.toIntOrNull() ?: 0
+                    if (w > 0 && h > 0) {
+                        onSave(template.copy(aspectRatio = ratio, cropMode = crop, targetWidthPx = w, targetHeightPx = h))
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7A0C20))
+            ) { Text("Save Standard") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable fun CouponTab(snackbarHostState: SnackbarHostState) {

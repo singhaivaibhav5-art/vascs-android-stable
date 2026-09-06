@@ -46,7 +46,9 @@ fun StylePartnerDashboardContent(
 ) {
     val isAnyReturnPeriodActive = transactions.any { it.status == "PENDING" }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFEFEFE))) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color(0xFFFEFEFE))) {
+        val isWide = this.maxWidth > 800.dp
+        
         // Watermark background
         Image(
             painter = painterResource(id = R.drawable.brand_name),
@@ -56,13 +58,13 @@ fun StylePartnerDashboardContent(
         )
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
+            modifier = Modifier.fillMaxSize().padding(if (isWide) 32.dp else 16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             item {
                 Text(
                     text = "Style Partner eWallet",
-                    fontSize = 28.sp,
+                    fontSize = if (isWide) 32.sp else 24.sp,
                     fontWeight = FontWeight.Black,
                     color = Color(0xFF0A5C36)
                 )
@@ -76,14 +78,23 @@ fun StylePartnerDashboardContent(
                 )
             }
 
-            item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        TransactionsTable(transactions)
+            if (isWide) {
+                item {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            TransactionsTable(transactions)
+                        }
+                        Column(modifier = Modifier.width(360.dp)) {
+                            BankDetailsCard()
+                        }
                     }
-                    Column(modifier = Modifier.width(360.dp)) {
-                        BankDetailsCard()
-                    }
+                }
+            } else {
+                item {
+                    BankDetailsCard()
+                }
+                item {
+                    TransactionsTable(transactions)
                 }
             }
         }
@@ -186,6 +197,10 @@ fun TransactionsTable(transactions: List<WalletTransactionEntity>) {
             
             val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
             
+            if (transactions.isEmpty()) {
+                Text("No transactions found", modifier = Modifier.padding(vertical = 16.dp), color = Color.Gray, fontSize = 12.sp)
+            }
+
             transactions.forEach { txn ->
                 HorizontalDivider(color = Color(0xFFF1F5F9))
                 Row(

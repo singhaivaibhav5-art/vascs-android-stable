@@ -97,6 +97,7 @@ fun FullHomeScreenPreview(
         VeeranshTheme {
             HomeScreenContent(
                 products = products,
+                activePlacements = emptyList(),
                 onProductClick = { _ -> },
                 onAdminAccess = {},
                 onToolClick = {}

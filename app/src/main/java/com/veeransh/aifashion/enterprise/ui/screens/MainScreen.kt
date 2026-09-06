@@ -30,6 +30,7 @@ import com.veeransh.aifashion.enterprise.ui.admin.UserSearchBlockPanel
 import com.veeransh.aifashion.enterprise.ui.admin.CODSettings
 import com.veeransh.aifashion.enterprise.ui.admin.SuperAdminDashboard
 import com.veeransh.aifashion.enterprise.ui.shop.StylePartnerDashboard
+import com.veeransh.aifashion.enterprise.ui.auth.AuthScreen
 import com.veeransh.aifashion.enterprise.data.local.entity.ProductEntity
 import com.veeransh.aifashion.enterprise.data.local.entity.OrderItemEntity
 import com.veeransh.aifashion.enterprise.data.local.entity.OrderMasterEntity
@@ -151,35 +152,50 @@ fun MainScreenContent(
                         if (homeViewModel != null) {
                             HomeScreen(
                                 viewModel = homeViewModel,
-                                onProductClick = { /* Navigate to Details */ },
+                                onProductClick = { product ->
+                                    navController.navigate("userPdp/${product.id}")
+                                },
                                 onAdminAccess = { showAdminPinDialog = true },
+                                onCartClick = { navController.navigate("cart") },
                                 onToolClick = { toolName ->
                                     val route = when (toolName) {
                                         "Finance" -> "finance"
                                         "Inventory" -> "inventory"
                                         "Sales" -> "sales"
-                                        "Customers" -> "customers"
-                                        "Stock" -> "stock"
-                                        "Reports" -> "reports"
-                                        "AI Center" -> "ai_brain"
+                                        "Customers" -> "placeholder/Customers"
+                                        "Stock" -> "inventory"
+                                        "Reports" -> "placeholder/Reports"
+                                        "AI Center" -> "placeholder/AI Center"
                                         "Analytics" -> "analytics"
                                         "Orders" -> "orders"
-                                        "B2B Portal" -> "b2b"
+                                        "B2B Portal" -> "placeholder/B2B Portal"
                                         "Style Partner" -> "ewallet"
-                                        "Admin Control" -> {
-                                            showAdminPinDialog = true
-                                            "home"
-                                        }
-                                        "Dispatch" -> "dispatch"
+                                        "Admin Control" -> "adminControl"
+                                        "Dispatch" -> "placeholder/Dispatch"
                                         else -> "home"
                                     }
                                     if (route != "home") navController.navigate(route)
                                 },
-                                onAddSareeClick = { navController.navigate("moveToDisplay") },
+                                onAddSareeClick = { navController.navigate("productStudio") },
                                 isAdmin = isAdmin,
                                 isDealer = isDealer
                             )
                         }
+                    }
+                    composable("productStudio") {
+                        com.veeransh.aifashion.enterprise.ui.studio.ProductStudioScreen(
+                            onBack = { navController.popBackStack() },
+                            onNavigateToPlacement = { productId ->
+                                navController.navigate("publishStudio/$productId")
+                            }
+                        )
+                    }
+                    composable("publishStudio/{productId}") { backStackEntry ->
+                        val productId = backStackEntry.arguments?.getString("productId") ?: ""
+                        com.veeransh.aifashion.enterprise.ui.studio.PublishStudioScreen(
+                            productId = productId,
+                            onBack = { navController.popBackStack() }
+                        )
                     }
                     composable("moveToDisplay") {
                         if (homeViewModel != null) {
@@ -241,42 +257,33 @@ fun MainScreenContent(
                         if (orderViewModel != null) {
                             OrdersScreen(
                                 viewModel = orderViewModel,
-                                onOrderClick = { /* Show details */ }
+                                onOrderClick = { order ->
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar("Order details: ${order.orderNumber}")
+                                    }
+                                }
                             )
                         }
                     }
-                    composable("customers") { PlaceholderScreen("Customer Relationship Management") }
-                    composable("stock") { PlaceholderScreen("Live Stock Monitoring") }
-                    composable("reports") { PlaceholderScreen("Business Reports") }
-                    composable("ai_center") { PlaceholderScreen("AI Fashion Center") }
-                    composable("ai_brain") {
-                        PlaceholderScreen("VASCS AI Brain - FROZEN")
+                    composable("auth") {
+                        AuthScreen(onAuthSuccess = {
+                            navController.navigate("home") {
+                                popUpTo("auth") { inclusive = true }
+                            }
+                        })
                     }
-                    composable("analytics") { PlaceholderScreen("Business Analytics") }
-                    composable(
-                        route = "add_saree?selectedIds={selectedIds}",
-                        arguments = listOf(navArgument("selectedIds") { nullable = true })
-                    ) { backStackEntry ->
-                        val selectedIds = backStackEntry.arguments?.getString("selectedIds")
-                        AddSareeScreen(
-                            onSave = { product ->
-                                onSaveProduct(product)
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("Product ${product.name} saved to ERP")
-                                }
-                                navController.popBackStack()
-                            },
-                            onBack = { navController.popBackStack() },
-                            selectedIds = selectedIds
-                        )
+                    composable("placeholder/{name}") { backStackEntry ->
+                        val name = backStackEntry.arguments?.getString("name") ?: "Module"
+                        PlaceholderScreen(name)
                     }
-                    
                     composable("categories") { PlaceholderScreen("Categories") }
-                    composable("profile") { PlaceholderScreen("User Profile") }
+                    composable("ai_center") { PlaceholderScreen("AI Center") }
+                    composable("analytics") { PlaceholderScreen("Analytics") }
+                    composable("profile") { PlaceholderScreen("User Profile - Logout in Admin Sidebar") }
                     composable("ewallet") { StylePartnerDashboard() }
                     composable("codSettings") { CODSettings() }
                     composable("adminControl") { 
-                        navController.navigate("super_admin")
+                        AdminControlScreen(onBack = { navController.popBackStack() })
                     }
                     composable("adminSearchBlock") {
                         UserSearchBlockPanel()

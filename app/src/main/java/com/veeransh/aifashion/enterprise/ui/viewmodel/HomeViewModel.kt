@@ -3,7 +3,9 @@ package com.veeransh.aifashion.enterprise.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.veeransh.aifashion.enterprise.data.repository.ProductRepository
+import com.veeransh.aifashion.enterprise.data.repository.PlacementRepository
 import com.veeransh.aifashion.enterprise.data.local.entity.ProductEntity
+import com.veeransh.aifashion.enterprise.data.local.entity.PlacementEntity
 import com.veeransh.aifashion.enterprise.types.CartItem
 import com.veeransh.aifashion.enterprise.types.UserPDPCouponItem
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,7 +17,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val placementRepository: PlacementRepository
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -37,6 +40,37 @@ class HomeViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
+
+    // Placement Data
+    val activePlacements: StateFlow<List<PlacementWithProduct>> = combine(
+        placementRepository.observeAllActivePlacements(),
+        products
+    ) { placements, productList ->
+        val currentTime = System.currentTimeMillis()
+        placements
+            .filter { it.status == "Published" }
+            .filter { isEligible(it, currentTime) }
+            .mapNotNull { placement ->
+                productList.find { it.id == placement.productId }?.let { product ->
+                    PlacementWithProduct(placement, product)
+                }
+            }
+            .sortedWith(compareBy({ it.placement.priority }, { it.placement.sortOrder }, { it.placement.placementId }))
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    private fun isEligible(placement: PlacementEntity, currentTime: Long): Boolean {
+        val startAt = placement.startAt
+        val endAt = placement.endAt
+        
+        if (startAt == null && endAt == null) return true
+        if (startAt != null && currentTime < startAt) return false
+        if (endAt != null && currentTime > endAt) return false
+        return true
+    }
 
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
@@ -114,3 +148,8 @@ class HomeViewModel @Inject constructor(
         }
     }
 }
+
+data class PlacementWithProduct(
+    val placement: PlacementEntity,
+    val product: ProductEntity
+)

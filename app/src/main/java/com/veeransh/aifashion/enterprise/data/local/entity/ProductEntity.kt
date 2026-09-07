@@ -34,5 +34,6 @@ data class ProductEntity(
     val supplierName: String = "",
     val description: String = "",
     val tags: String = "",
-    val createdAt: String = ""
+    val createdAt: String = "",
+    val status: String = "ACTIVE" // DRAFT, ACTIVE, ARCHIVED
 )

@@ -166,5 +166,12 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_stock_balances_productId_locationId` ON `stock_balances` (`productId`, `locationId`)")
             }
         }
+
+        val MIGRATION_13_14 = object : androidx.room.migration.Migration(13, 14) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // Add status column to products for lifecycle management (Phase 3.4.2A)
+                db.execSQL("ALTER TABLE products ADD COLUMN status TEXT NOT NULL DEFAULT 'ACTIVE'")
+            }
+        }
     }
 }

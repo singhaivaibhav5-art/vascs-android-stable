@@ -106,38 +106,38 @@ fun ProductStudioContent(
     val context = LocalContext.current
     
     // Form State
-    var name by remember { mutableStateOf(initialProduct.name) }
-    var sku by remember { mutableStateOf(initialProduct.sku) }
-    var barcode by remember { mutableStateOf(initialProduct.barcode) }
-    var category by remember { mutableStateOf(initialProduct.category) }
-    var subCategory by remember { mutableStateOf(initialProduct.subCategory) }
-    var brand by remember { mutableStateOf(initialProduct.brand) }
-    var fabric by remember { mutableStateOf(initialProduct.fabric) }
-    var colour by remember { mutableStateOf(initialProduct.colour) }
-    var size by remember { mutableStateOf(initialProduct.size) }
-    var hsn by remember { mutableStateOf(initialProduct.hsn) }
-    var gst by remember { mutableDoubleStateOf(initialProduct.gst) }
-    var purchasePrice by remember { mutableStateOf(if(initialProduct.purchasePrice > 0) initialProduct.purchasePrice.toString() else "") }
-    var wholesalePrice by remember { mutableStateOf(if(initialProduct.wholesalePrice > 0) initialProduct.wholesalePrice.toString() else "") }
-    var retailPrice by remember { mutableStateOf(if(initialProduct.retailPrice > 0) initialProduct.retailPrice.toString() else "") }
-    var dealerPrice by remember { mutableStateOf(if(initialProduct.dealerPrice > 0) initialProduct.dealerPrice.toString() else "") }
-    var partnerPrice by remember { mutableStateOf(if(initialProduct.partnerPrice > 0) initialProduct.partnerPrice.toString() else "") }
-    var mrp by remember { mutableStateOf(if(initialProduct.mrp > 0) initialProduct.mrp.toString() else "") }
-    var discount by remember { mutableDoubleStateOf(initialProduct.discount) }
-    var stock by remember { mutableIntStateOf(initialProduct.stock) }
-    var lowStockAlert by remember { mutableIntStateOf(initialProduct.lowStockAlert) }
-    var location by remember { mutableStateOf(initialProduct.location) }
-    var weight by remember { mutableStateOf(initialProduct.weight) }
-    var description by remember { mutableStateOf(initialProduct.description) }
+    var name by remember(initialProduct.id) { mutableStateOf(initialProduct.name) }
+    var sku by remember(initialProduct.id) { mutableStateOf(initialProduct.sku) }
+    var barcode by remember(initialProduct.id) { mutableStateOf(initialProduct.barcode) }
+    var category by remember(initialProduct.id) { mutableStateOf(initialProduct.category) }
+    var subCategory by remember(initialProduct.id) { mutableStateOf(initialProduct.subCategory) }
+    var brand by remember(initialProduct.id) { mutableStateOf(initialProduct.brand) }
+    var fabric by remember(initialProduct.id) { mutableStateOf(initialProduct.fabric) }
+    var colour by remember(initialProduct.id) { mutableStateOf(initialProduct.colour) }
+    var size by remember(initialProduct.id) { mutableStateOf(initialProduct.size) }
+    var hsn by remember(initialProduct.id) { mutableStateOf(initialProduct.hsn) }
+    var gst by remember(initialProduct.id) { mutableDoubleStateOf(initialProduct.gst) }
+    var purchasePrice by remember(initialProduct.id) { mutableStateOf(if(initialProduct.purchasePrice > 0) initialProduct.purchasePrice.toString() else "") }
+    var wholesalePrice by remember(initialProduct.id) { mutableStateOf(if(initialProduct.wholesalePrice > 0) initialProduct.wholesalePrice.toString() else "") }
+    var retailPrice by remember(initialProduct.id) { mutableStateOf(if(initialProduct.retailPrice > 0) initialProduct.retailPrice.toString() else "") }
+    var dealerPrice by remember(initialProduct.id) { mutableStateOf(if(initialProduct.dealerPrice > 0) initialProduct.dealerPrice.toString() else "") }
+    var partnerPrice by remember(initialProduct.id) { mutableStateOf(if(initialProduct.partnerPrice > 0) initialProduct.partnerPrice.toString() else "") }
+    var mrp by remember(initialProduct.id) { mutableStateOf(if(initialProduct.mrp > 0) initialProduct.mrp.toString() else "") }
+    var discount by remember(initialProduct.id) { mutableDoubleStateOf(initialProduct.discount) }
+    var stock by remember(initialProduct.id) { mutableIntStateOf(initialProduct.stock) }
+    var lowStockAlert by remember(initialProduct.id) { mutableIntStateOf(initialProduct.lowStockAlert) }
+    var location by remember(initialProduct.id) { mutableStateOf(initialProduct.location) }
+    var weight by remember(initialProduct.id) { mutableStateOf(initialProduct.weight) }
+    var description by remember(initialProduct.id) { mutableStateOf(initialProduct.description) }
     
     // Images State
-    val images = remember { mutableStateListOf<String>().apply { 
+    val images = remember(initialProduct.id) { mutableStateListOf<String>().apply { 
         addAll(initialProduct.imagesJson.parseJsonArray())
         if (isEmpty() && initialProduct.image.isNotBlank()) {
             add(initialProduct.image)
         }
     } }
-    var mainImageUri by remember { mutableStateOf(initialProduct.image) }
+    var mainImageUri by remember(initialProduct.id) { mutableStateOf(initialProduct.image) }
     
     // Ensure consistency
     if (mainImageUri.isBlank() && images.isNotEmpty()) {

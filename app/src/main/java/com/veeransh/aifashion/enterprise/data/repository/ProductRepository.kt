@@ -21,4 +21,8 @@ class ProductRepository @Inject constructor(
     fun searchProducts(query: String): Flow<List<ProductEntity>> = productDao.search(query)
 
     suspend fun deleteProduct(id: String) = productDao.deleteById(id)
+
+    suspend fun existsBySku(sku: String) = productDao.existsBySku(sku)
+
+    suspend fun existsByBarcode(barcode: String) = productDao.existsByBarcode(barcode)
 }

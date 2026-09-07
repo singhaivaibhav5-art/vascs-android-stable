@@ -129,6 +129,7 @@ fun ProductStudioContent(
     var location by remember(initialProduct.id) { mutableStateOf(initialProduct.location) }
     var weight by remember(initialProduct.id) { mutableStateOf(initialProduct.weight) }
     var description by remember(initialProduct.id) { mutableStateOf(initialProduct.description) }
+    var status by remember(initialProduct.id) { mutableStateOf(initialProduct.status) }
     
     // Images State
     val images = remember(initialProduct.id) { mutableStateListOf<String>().apply { 
@@ -183,7 +184,8 @@ fun ProductStudioContent(
             weight = weight, location = location, description = description, 
             tags = finalTags,
             image = mainImageUri,
-            imagesJson = images.toJsonArray()
+            imagesJson = images.toJsonArray(),
+            status = status
         )
     }
 
@@ -384,6 +386,18 @@ fun ProductStudioContent(
                     StudioTextField("Product ID (Auto)", initialProduct.id, {}, readOnly = true)
                     StudioTextField("SKU *", sku, { sku = it })
                     StudioTextField("Barcode", barcode, { barcode = it })
+                    
+                    val statusOptions = listOf("ACTIVE", "DRAFT", "ARCHIVED")
+                    val statusLabels = mapOf("ACTIVE" to "Active", "DRAFT" to "Draft", "ARCHIVED" to "Archived")
+                    
+                    DropdownField(
+                        label = "Lifecycle Status",
+                        value = statusLabels[status] ?: "Active",
+                        options = statusOptions.map { statusLabels[it] ?: it },
+                        onSelect = { label ->
+                            status = statusOptions.find { statusLabels[it] == label } ?: "ACTIVE"
+                        }
+                    )
                 }
             }
 

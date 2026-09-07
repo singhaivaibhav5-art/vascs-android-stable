@@ -23,6 +23,7 @@ data class OrderItemEntity(
     val qty: Int,
     val rate: Double,
     val amount: Double,
-    val gst: Double,
+    val taxRate: Double = 0.0, // Percentage rate used at sale time (Phase 3.2)
+    val gst: Double, // Absolute tax amount
     val netAmount: Double
 )

@@ -26,4 +26,7 @@ interface ProductDao {
 
     @Query("UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :qty")
     suspend fun deductStock(id: String, qty: Int): Int
+
+    @Query("UPDATE products SET stock = stock + :qty WHERE id = :id")
+    suspend fun incrementStock(id: String, qty: Int): Int
 }

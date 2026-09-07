@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.veeransh.aifashion.enterprise.data.repository.ProductRepository
 import com.veeransh.aifashion.enterprise.data.repository.PlacementRepository
+import com.veeransh.aifashion.enterprise.data.repository.StockRepository
 import com.veeransh.aifashion.enterprise.data.local.entity.ProductEntity
 import com.veeransh.aifashion.enterprise.data.local.entity.PlacementEntity
 import com.veeransh.aifashion.enterprise.types.CartItem
@@ -18,7 +19,8 @@ import javax.inject.Inject
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val productRepository: ProductRepository,
-    private val placementRepository: PlacementRepository
+    private val placementRepository: PlacementRepository,
+    private val stockRepository: StockRepository
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -131,14 +133,24 @@ class HomeViewModel @Inject constructor(
                     image = "",
                     createdAt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                 )
-                productRepository.insertProduct(sampleProduct)
+                saveProduct(sampleProduct)
             }
         }
     }
 
     fun saveProduct(product: ProductEntity) {
         viewModelScope.launch {
-            productRepository.insertProduct(product)
+            val initialStock = product.stock
+            // Insert with 0 stock first, then adjust to create ledger entry
+            productRepository.insertProduct(product.copy(stock = 0))
+            if (initialStock > 0) {
+                stockRepository.adjustStock(
+                    productId = product.id,
+                    adjustmentType = "ADJUSTMENT_ADD",
+                    quantity = initialStock,
+                    reason = "Opening stock"
+                )
+            }
         }
     }
 
@@ -147,6 +159,29 @@ class HomeViewModel @Inject constructor(
             productRepository.updateProduct(product)
         }
     }
+
+    private val _stockOpResult = MutableStateFlow<Result<Unit>?>(null)
+    val stockOpResult = _stockOpResult.asStateFlow()
+
+    fun adjustStock(
+        productId: String,
+        type: String,
+        qty: Int,
+        reason: String
+    ) {
+        viewModelScope.launch {
+            val result = stockRepository.adjustStock(productId, type, qty, reason)
+            _stockOpResult.value = result
+        }
+    }
+
+    fun clearStockOpResult() {
+        _stockOpResult.value = null
+    }
+
+    fun observeTransactions(productId: String) = stockRepository.observeTransactionsByProduct(productId)
+    
+    fun observeBalance(productId: String) = stockRepository.observeBalance(productId)
 }
 
 data class PlacementWithProduct(

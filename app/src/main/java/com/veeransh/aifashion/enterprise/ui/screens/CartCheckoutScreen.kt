@@ -245,7 +245,7 @@ fun CartCheckoutContent(
                         }
                         
                         SummaryRow("Taxable Amount", "₹${calc.taxableAmount.toInt()}")
-                        SummaryRow("GST (5%)", "₹${calc.gstAmount.toInt()}")
+                        SummaryRow("GST", "₹${calc.gstAmount.toInt()}")
                         
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = brandBorder)
                         

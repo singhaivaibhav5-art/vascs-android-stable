@@ -21,6 +21,7 @@ import com.veeransh.aifashion.enterprise.util.FinancialCalculator
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 @HiltViewModel
@@ -83,8 +84,11 @@ class OrderViewModel @Inject constructor(
                 } else 0.0
                 
                 val itemTaxableAmount = itemSubtotalAfterProductDiscount - itemCartDiscount
-                val itemGst = (itemTaxableAmount * 0.05).roundToInt().toDouble()
-                val itemNetAmount = itemTaxableAmount + itemGst
+                
+                // Use Product's GST rate for snapshotting (Phase 3.2)
+                val itemGstRate = max(0.0, item.product.gst)
+                val itemGstAmount = (itemTaxableAmount * (itemGstRate / 100.0)).roundToInt().toDouble()
+                val itemNetAmount = itemTaxableAmount + itemGstAmount
                 
                 OrderItemEntity(
                     orderId = 0L,
@@ -94,7 +98,8 @@ class OrderViewModel @Inject constructor(
                     qty = item.qty,
                     rate = if (item.qty > 0) (itemTaxableAmount / item.qty) else 0.0, // Fully discounted rate
                     amount = itemTaxableAmount,
-                    gst = itemGst,
+                    taxRate = itemGstRate, // Snapshotted rate
+                    gst = itemGstAmount,
                     netAmount = itemNetAmount
                 )
             }

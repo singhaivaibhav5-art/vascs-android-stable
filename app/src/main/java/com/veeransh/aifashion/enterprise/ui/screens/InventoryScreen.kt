@@ -1,11 +1,14 @@
 package com.veeransh.aifashion.enterprise.ui.screens
 
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -15,7 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -25,16 +30,33 @@ import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
 fun InventoryScreen(
-    viewModel: HomeViewModel = hiltViewModel()
+    viewModel: HomeViewModel = hiltViewModel(),
+    onNavigateToHistory: (String) -> Unit
 ) {
     val products by viewModel.products.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val stockOpResult by viewModel.stockOpResult.collectAsState()
+    val context = LocalContext.current
+
+    var selectedProductForAdjustment by remember { mutableStateOf<ProductEntity?>(null) }
     
     val filteredProducts = remember(products, searchQuery) {
         products.filter { 
             it.name.contains(searchQuery, ignoreCase = true) || 
             it.sku.contains(searchQuery, ignoreCase = true) ||
             it.barcode.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
+    LaunchedEffect(stockOpResult) {
+        stockOpResult?.let {
+            if (it.isSuccess) {
+                Toast.makeText(context, "Stock adjusted successfully", Toast.LENGTH_SHORT).show()
+                selectedProductForAdjustment = null
+            } else {
+                Toast.makeText(context, "Error: ${it.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+            }
+            viewModel.clearStockOpResult()
         }
     }
 
@@ -77,25 +99,29 @@ fun InventoryScreen(
             items(filteredProducts) { product ->
                 InventoryItemRow(
                     product = product,
-                    onIncrement = { 
-                        viewModel.updateProduct(product.copy(stock = product.stock + 1))
-                    },
-                    onDecrement = { 
-                        if (product.stock > 0) {
-                            viewModel.updateProduct(product.copy(stock = product.stock - 1))
-                        }
-                    }
+                    onAdjust = { selectedProductForAdjustment = product },
+                    onHistory = { onNavigateToHistory(product.id) }
                 )
             }
         }
+    }
+
+    if (selectedProductForAdjustment != null) {
+        StockAdjustmentDialog(
+            product = selectedProductForAdjustment!!,
+            onDismiss = { selectedProductForAdjustment = null },
+            onSave = { type, qty, reason ->
+                viewModel.adjustStock(selectedProductForAdjustment!!.id, type, qty, reason)
+            }
+        )
     }
 }
 
 @Composable
 fun InventoryItemRow(
     product: ProductEntity,
-    onIncrement: () -> Unit,
-    onDecrement: () -> Unit
+    onAdjust: () -> Unit,
+    onHistory: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -166,36 +192,86 @@ fun InventoryItemRow(
                 }
             }
             
-            // Stock Controls
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onDecrement,
-                    modifier = Modifier.size(32.dp)
+            Column(horizontalAlignment = Alignment.End) {
+                Button(
+                    onClick = onAdjust,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D5C36)),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.RemoveCircleOutline, 
-                        contentDescription = "Decrease",
-                        tint = Color.Gray
-                    )
+                    Text("Adjust", fontSize = 11.sp)
                 }
-                
-                Text(
-                    text = "${product.stock}",
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                    fontWeight = FontWeight.Bold
-                )
-                
-                IconButton(
-                    onClick = onIncrement,
-                    modifier = Modifier.size(32.dp)
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onHistory,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.height(32.dp),
+                    border = BorderStroke(1.dp, Color.LightGray)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.AddCircleOutline, 
-                        contentDescription = "Increase",
-                        tint = Color(0xFF0D5C36)
-                    )
+                    Text("History", fontSize = 11.sp, color = Color.Gray)
                 }
             }
         }
     }
+}
+
+@Composable
+fun StockAdjustmentDialog(
+    product: ProductEntity,
+    onDismiss: () -> Unit,
+    onSave: (String, Int, String) -> Unit
+) {
+    var type by remember { mutableStateOf("ADJUSTMENT_ADD") }
+    var qtyText by remember { mutableStateOf("") }
+    var reason by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Adjust Stock: ${product.sku}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("Current Stock: ${product.stock}", fontWeight = FontWeight.Bold)
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = type == "ADJUSTMENT_ADD", onClick = { type = "ADJUSTMENT_ADD" })
+                    Text("Add Stock", modifier = Modifier.padding(end = 16.dp))
+                    RadioButton(selected = type == "ADJUSTMENT_SUB", onClick = { type = "ADJUSTMENT_SUB" })
+                    Text("Remove Stock")
+                }
+                
+                OutlinedTextField(
+                    value = qtyText,
+                    onValueChange = { qtyText = it },
+                    label = { Text("Quantity") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    label = { Text("Reason (Required)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val qty = qtyText.toIntOrNull() ?: 0
+                    if (qty > 0 && reason.isNotBlank()) {
+                        onSave(type, qty, reason)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7A0C20))
+            ) {
+                Text("Save Adjustment")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }

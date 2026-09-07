@@ -7,6 +7,7 @@ import com.veeransh.aifashion.enterprise.data.local.dao.AdminConfigDao
 import com.veeransh.aifashion.enterprise.data.local.entity.AdminConfigEntity
 import com.veeransh.aifashion.enterprise.data.local.entity.ProductEntity
 import com.veeransh.aifashion.enterprise.data.repository.ProductRepository
+import com.veeransh.aifashion.enterprise.data.repository.StockRepository
 import com.veeransh.aifashion.enterprise.types.PlacementTemplate
 import com.veeransh.aifashion.enterprise.util.PlacementTemplateHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,7 +19,8 @@ import javax.inject.Inject
 class SuperAdminViewModel @Inject constructor(
     private val adminPreferences: AdminPreferences,
     private val productRepository: ProductRepository,
-    private val adminConfigDao: AdminConfigDao
+    private val adminConfigDao: AdminConfigDao,
+    private val stockRepository: StockRepository
 ) : ViewModel() {
 
     val enableCod = adminPreferences.enableCod.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
@@ -48,8 +50,16 @@ class SuperAdminViewModel @Inject constructor(
 
     fun updateStock(product: ProductEntity, delta: Int) {
         viewModelScope.launch {
-            val newStock = (product.stock + delta).coerceAtLeast(0)
-            productRepository.updateProduct(product.copy(stock = newStock))
+            val type = if (delta >= 0) "ADJUSTMENT_ADD" else "ADJUSTMENT_SUB"
+            val qty = Math.abs(delta)
+            if (qty == 0) return@launch
+            
+            stockRepository.adjustStock(
+                productId = product.id,
+                adjustmentType = type,
+                quantity = qty,
+                reason = "Super Admin manual adjustment"
+            )
         }
     }
 

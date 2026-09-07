@@ -18,9 +18,11 @@ import com.veeransh.aifashion.enterprise.data.local.entity.*
         FinishedGoodsEntity::class,
         AdminConfigEntity::class,
         AiDrapeResultEntity::class,
-        PlacementEntity::class
+        PlacementEntity::class,
+        StockTransactionEntity::class,
+        StockBalanceEntity::class
     ],
-    version = 11,
+    version = 13,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -34,6 +36,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun adminConfigDao(): AdminConfigDao
     abstract fun aiDrapeResultDao(): AiDrapeResultDao
     abstract fun placementDao(): PlacementDao
+    abstract fun stockTransactionDao(): StockTransactionDao
+    abstract fun stockBalanceDao(): StockBalanceDao
 
     companion object {
         val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
@@ -138,6 +142,28 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE product_placements ADD COLUMN sourceUri TEXT NOT NULL DEFAULT ''")
                 // Initial data copy: previous imageUri becomes sourceUri if it wasn't a processed asset
                 db.execSQL("UPDATE product_placements SET sourceUri = imageUri")
+            }
+        }
+
+        val MIGRATION_11_12 = object : androidx.room.migration.Migration(11, 12) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // Add taxRate column to order_items for historical snapshot (Phase 3.2)
+                db.execSQL("ALTER TABLE order_items ADD COLUMN taxRate REAL NOT NULL DEFAULT 0.0")
+            }
+        }
+
+        val MIGRATION_12_13 = object : androidx.room.migration.Migration(12, 13) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // 1. Create stock_transactions table
+                db.execSQL("CREATE TABLE IF NOT EXISTS `stock_transactions` (`transactionId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `productId` TEXT NOT NULL, `transactionType` TEXT NOT NULL, `quantity` INTEGER NOT NULL, `referenceType` TEXT NOT NULL, `referenceId` TEXT NOT NULL, `batchId` INTEGER, `locationId` TEXT NOT NULL, `unitCost` REAL NOT NULL, `balanceAfter` INTEGER NOT NULL, `notes` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_stock_transactions_productId` ON `stock_transactions` (`productId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_stock_transactions_transactionType` ON `stock_transactions` (`transactionType`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_stock_transactions_referenceType_referenceId` ON `stock_transactions` (`referenceType`, `referenceId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_stock_transactions_createdAt` ON `stock_transactions` (`createdAt`)")
+
+                // 2. Create stock_balances table
+                db.execSQL("CREATE TABLE IF NOT EXISTS `stock_balances` (`balanceId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `productId` TEXT NOT NULL, `locationId` TEXT NOT NULL, `totalStock` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_stock_balances_productId_locationId` ON `stock_balances` (`productId`, `locationId`)")
             }
         }
     }

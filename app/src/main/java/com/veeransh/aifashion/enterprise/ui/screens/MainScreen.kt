@@ -240,8 +240,26 @@ fun MainScreenContent(
                     composable("inventory") { 
                         if (homeViewModel != null) {
                             InventoryScreen(
-                                viewModel = homeViewModel
+                                viewModel = homeViewModel,
+                                onNavigateToHistory = { productId ->
+                                    navController.navigate("stockHistory/$productId")
+                                }
                             ) 
+                        }
+                    }
+                    composable("stockHistory/{productId}") { backStackEntry ->
+                        val productId = backStackEntry.arguments?.getString("productId") ?: ""
+                        if (homeViewModel != null) {
+                            com.veeransh.aifashion.enterprise.ui.inventory.StockHistoryScreen(
+                                productId = productId,
+                                viewModel = homeViewModel,
+                                onBack = { navController.popBackStack() },
+                                onNavigateToOrder = { orderId ->
+                                    // Current orders screen shows list. If specific detail screen exists, navigate there.
+                                    // For now, navigate to orders list.
+                                    navController.navigate("orders")
+                                }
+                            )
                         }
                     }
                     composable("sales") { 

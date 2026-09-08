@@ -22,7 +22,7 @@ import com.veeransh.aifashion.enterprise.data.local.entity.*
         StockTransactionEntity::class,
         StockBalanceEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

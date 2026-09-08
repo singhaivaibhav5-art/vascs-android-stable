@@ -26,16 +26,40 @@ class HomeViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
+    // Role state for visibility filtering (Phase 3.4.2B)
+    private val _isAdmin = MutableStateFlow(false)
+    val isAdmin = _isAdmin.asStateFlow()
+
+    private val _isDealer = MutableStateFlow(false)
+    val isDealer = _isDealer.asStateFlow()
+
+    fun updateRoles(admin: Boolean, dealer: Boolean) {
+        _isAdmin.value = admin
+        _isDealer.value = dealer
+    }
+
     val products: StateFlow<List<ProductEntity>> = productRepository.allProducts.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
 
-    val filteredProducts: StateFlow<List<ProductEntity>> = combine(products, _searchQuery) { list, query ->
-        if (query.isEmpty()) list
-        else list.filter {
-            it.name.contains(query, ignoreCase = true) || it.sku.contains(query, ignoreCase = true)
+    val filteredProducts: StateFlow<List<ProductEntity>> = combine(
+        products, _searchQuery, _isAdmin, _isDealer
+    ) { list, query, admin, dealer ->
+        list.filter { product ->
+            // 1. Visibility Rule: Status + Stock based on Role
+            val isVisible = if (admin || dealer) {
+                product.status != "ARCHIVED"
+            } else {
+                product.status == "ACTIVE" && product.stock > 0
+            }
+            
+            if (!isVisible) return@filter false
+            
+            // 2. Search Rule
+            if (query.isEmpty()) true
+            else product.name.contains(query, ignoreCase = true) || product.sku.contains(query, ignoreCase = true)
         }
     }.stateIn(
         scope = viewModelScope,
@@ -43,18 +67,27 @@ class HomeViewModel @Inject constructor(
         initialValue = emptyList()
     )
 
-    // Placement Data
+    // Placement Data (Phase 3.4.2B visibility logic applied)
     val activePlacements: StateFlow<List<PlacementWithProduct>> = combine(
         placementRepository.observeAllActivePlacements(),
-        products
-    ) { placements, productList ->
+        products,
+        _isAdmin,
+        _isDealer
+    ) { placements, productList, admin, dealer ->
         val currentTime = System.currentTimeMillis()
         placements
             .filter { it.status == "Published" }
             .filter { isEligible(it, currentTime) }
             .mapNotNull { placement ->
                 productList.find { it.id == placement.productId }?.let { product ->
-                    PlacementWithProduct(placement, product)
+                    // Apply product visibility constraints to placements
+                    val isVisible = if (admin || dealer) {
+                        product.status != "ARCHIVED"
+                    } else {
+                        product.status == "ACTIVE" && product.stock > 0
+                    }
+                    
+                    if (isVisible) PlacementWithProduct(placement, product) else null
                 }
             }
             .sortedWith(compareBy({ it.placement.priority }, { it.placement.sortOrder }, { it.placement.placementId }))

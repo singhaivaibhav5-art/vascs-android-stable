@@ -37,6 +37,7 @@ import com.veeransh.aifashion.enterprise.ui.viewmodel.HomeViewModel
 import com.veeransh.aifashion.enterprise.types.UserPDPCouponItem
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
+import kotlin.math.max
 import kotlin.math.roundToInt
 
 @Composable
@@ -47,14 +48,27 @@ fun UserPDPDetailScreen(
 ) {
     val products by viewModel.products.collectAsState()
     val product = products.find { it.id == productId }
+    val isDealer by viewModel.isDealer.collectAsState()
 
     if (product != null) {
+        // Effective MOQ for state initialization
+        val effectiveMin = remember(product, isDealer) {
+            if (!product.isMoqEnabled) 1
+            else if (isDealer) product.dealerMoq
+            else product.moq
+        }.coerceAtLeast(1)
+
+        var quantity by remember(product.id, effectiveMin) { mutableIntStateOf(effectiveMin) }
+
         UserPDPDetailContent(
             product = product,
             onBack = onBack,
             onAddToCart = { p, coupon ->
-                viewModel.addToCart(p, 1, coupon)
-            }
+                viewModel.addToCart(p, quantity, coupon)
+            },
+            isDealer = isDealer,
+            quantity = quantity,
+            onQuantityChange = { quantity = it }
         )
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -68,7 +82,10 @@ fun UserPDPDetailScreen(
 fun UserPDPDetailContent(
     product: ProductEntity,
     onBack: () -> Unit,
-    onAddToCart: (ProductEntity, UserPDPCouponItem?) -> Unit
+    onAddToCart: (ProductEntity, UserPDPCouponItem?) -> Unit,
+    isDealer: Boolean = false,
+    quantity: Int = 1,
+    onQuantityChange: (Int) -> Unit = {}
 ) {
     val maroon = Color(0xFF7A0C20)
     val gold = Color(0xFFD4AF37)
@@ -130,56 +147,12 @@ fun UserPDPDetailContent(
                     .verticalScroll(rememberScrollState())
             ) {
                 if (isWide) {
-                    WidePDPLayout(product, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, { selectedCouponCode = it })
+                    WidePDPLayout(product, isDealer, quantity, onQuantityChange, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, { selectedCouponCode = it })
                 } else {
-                    MobilePDPLayout(product, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, { selectedCouponCode = it })
+                    MobilePDPLayout(product, isDealer, quantity, onQuantityChange, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, { selectedCouponCode = it })
                 }
                 
-                // INFO FOOTER
-                Surface(
-                    modifier = Modifier
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
-                        .fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, Color.White),
-                    color = Color.White.copy(alpha = 0.5f)
-                ) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(16.dp), tint = maroon)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            "Ratio auto applied per location: Home Banner 16:9 900x506, Grid 4:5 800x1000, Ad 1:1 800x800. Admin checked productGrid, homeBanner → auto crops preview.",
-                            fontSize = 11.sp,
-                            color = Color.Gray.copy(alpha = 0.8f)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // BOTTOM BAR
-                Surface(
-                    modifier = Modifier
-                        .padding(horizontal = 24.dp, vertical = 24.dp)
-                        .fillMaxWidth(),
-                    color = maroon,
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    FlowRow(
-                        modifier = Modifier.padding(20.dp),
-                        mainAxisSpacing = 16.dp,
-                        crossAxisSpacing = 12.dp
-                    ) {
-                        MetaItem("Product ID", product.id)
-                        MetaItem("SKU", product.sku)
-                        MetaItem("QR", "VERIFIED")
-                        MetaItem("Size", product.size)
-                        MetaItem("Ratio", "4:5")
-                        MetaItem("Fit", "Cover")
-                        MetaItem("Stock", "${product.stock}")
-                        MetaItem("Display", product.location.replace("|", ", "))
-                    }
-                }
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
@@ -188,6 +161,9 @@ fun UserPDPDetailContent(
 @Composable
 fun MobilePDPLayout(
     product: ProductEntity,
+    isDealer: Boolean,
+    quantity: Int,
+    onQuantityChange: (Int) -> Unit,
     basePrice: Double,
     finalPrice: Double,
     discountValue: Double,
@@ -221,13 +197,16 @@ fun MobilePDPLayout(
         }
         
         // Content
-        PDPContentSection(product, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, onCouponSelect)
+        PDPContentSection(product, isDealer, quantity, onQuantityChange, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, onCouponSelect)
     }
 }
 
 @Composable
 fun WidePDPLayout(
     product: ProductEntity,
+    isDealer: Boolean,
+    quantity: Int,
+    onQuantityChange: (Int) -> Unit,
     basePrice: Double,
     finalPrice: Double,
     discountValue: Double,
@@ -253,7 +232,7 @@ fun WidePDPLayout(
             }
         }
         Column(modifier = Modifier.weight(1f)) {
-            PDPContentSection(product, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, onCouponSelect)
+            PDPContentSection(product, isDealer, quantity, onQuantityChange, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, onCouponSelect)
         }
     }
 }
@@ -261,6 +240,9 @@ fun WidePDPLayout(
 @Composable
 fun PDPContentSection(
     product: ProductEntity,
+    isDealer: Boolean,
+    quantity: Int,
+    onQuantityChange: (Int) -> Unit,
     basePrice: Double,
     finalPrice: Double,
     discountValue: Double,
@@ -277,6 +259,15 @@ fun PDPContentSection(
     onAddToCart: (ProductEntity, UserPDPCouponItem?) -> Unit,
     onCouponSelect: (String) -> Unit
 ) {
+    // MOQ Logic
+    val effectiveMin = remember(product, isDealer) {
+        if (!product.isMoqEnabled) 1
+        else if (isDealer) product.dealerMoq
+        else product.moq
+    }.coerceAtLeast(1)
+
+    val isStockInsufficient = effectiveMin > product.stock
+
     Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
         // Title & Price Section
         Card(
@@ -354,25 +345,97 @@ fun PDPContentSection(
             }
         }
 
-        // ACTIONS
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
-                onClick = { onAddToCart(product, selectedCoupon) },
-                modifier = Modifier.weight(1f).height(48.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = maroon)
-            ) {
-                Text("Add to Cart — ₹${finalPrice.toInt()}", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        // QUANTITY & ACTIONS
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (isStockInsufficient) {
+                Surface(
+                    color = Color.Red.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Error, null, tint = Color.Red, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            "Minimum quantity ($effectiveMin) exceeds available stock (${product.stock}).",
+                            color = Color.Red,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Quantity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    if (product.isMoqEnabled) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(color = maroon.copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp)) {
+                            Text(
+                                "Min: $effectiveMin",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = maroon
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.weight(1f))
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(Color.White, CircleShape)
+                            .border(1.dp, brandBorder, CircleShape)
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        IconButton(
+                            onClick = { if (quantity > effectiveMin) onQuantityChange(quantity - 1) },
+                            modifier = Modifier.size(32.dp),
+                            enabled = quantity > effectiveMin
+                        ) {
+                            Icon(Icons.Default.Remove, null, modifier = Modifier.size(16.dp))
+                        }
+                        
+                        Text(
+                            text = "$quantity",
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Black
+                        )
+                        
+                        IconButton(
+                            onClick = { if (quantity < product.stock) onQuantityChange(quantity + 1) },
+                            modifier = Modifier.size(32.dp),
+                            enabled = quantity < product.stock
+                        ) {
+                            Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
             }
-            
-            OutlinedButton(
-                onClick = {},
-                modifier = Modifier.size(48.dp),
-                shape = CircleShape,
-                contentPadding = PaddingValues(0.dp),
-                border = BorderStroke(1.dp, brandBorder)
-            ) {
-                Icon(Icons.Default.ShoppingBag, contentDescription = "Bag", modifier = Modifier.size(18.dp), tint = darkText)
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = { onAddToCart(product, selectedCoupon) },
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = maroon),
+                    enabled = !isStockInsufficient && quantity <= product.stock && quantity >= effectiveMin
+                ) {
+                    Text("Add to Cart — ₹${(finalPrice * quantity).toInt()}", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
+                
+                OutlinedButton(
+                    onClick = {},
+                    modifier = Modifier.size(48.dp),
+                    shape = CircleShape,
+                    contentPadding = PaddingValues(0.dp),
+                    border = BorderStroke(1.dp, brandBorder)
+                ) {
+                    Icon(Icons.Default.ShoppingBag, contentDescription = "Bag", modifier = Modifier.size(18.dp), tint = darkText)
+                }
             }
         }
 
@@ -412,30 +475,3 @@ fun FeatureItem(icon: ImageVector, label: String) {
         Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
     }
 }
-
-@Composable
-fun MetaItem(label: String, value: String) {
-    Column {
-        Text(label, fontSize = 9.sp, color = Color.White.copy(alpha = 0.6f))
-        Text(value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun FlowRow(
-    modifier: Modifier = Modifier,
-    mainAxisSpacing: androidx.compose.ui.unit.Dp = 0.dp,
-    crossAxisSpacing: androidx.compose.ui.unit.Dp = 0.dp,
-    content: @Composable () -> Unit
-) {
-    androidx.compose.foundation.layout.FlowRow(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(mainAxisSpacing),
-        verticalArrangement = Arrangement.spacedBy(crossAxisSpacing),
-        content = { content() }
-    )
-}
-
-
-

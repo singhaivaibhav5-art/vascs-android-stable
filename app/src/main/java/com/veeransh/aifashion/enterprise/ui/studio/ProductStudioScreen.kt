@@ -131,6 +131,11 @@ fun ProductStudioContent(
     var description by remember(initialProduct.id) { mutableStateOf(initialProduct.description) }
     var status by remember(initialProduct.id) { mutableStateOf(initialProduct.status) }
     
+    // MOQ State
+    var moq by remember(initialProduct.id) { mutableStateOf(initialProduct.moq.coerceAtLeast(1).toString()) }
+    var dealerMoq by remember(initialProduct.id) { mutableStateOf(initialProduct.dealerMoq.coerceAtLeast(1).toString()) }
+    var isMoqEnabled by remember(initialProduct.id) { mutableStateOf(initialProduct.isMoqEnabled) }
+    
     // Images State
     val images = remember(initialProduct.id) { mutableStateListOf<String>().apply { 
         addAll(initialProduct.imagesJson.parseJsonArray())
@@ -185,7 +190,10 @@ fun ProductStudioContent(
             tags = finalTags,
             image = mainImageUri,
             imagesJson = images.toJsonArray(),
-            status = status
+            status = status,
+            moq = moq.toIntOrNull()?.coerceAtLeast(1) ?: 1,
+            dealerMoq = dealerMoq.toIntOrNull()?.coerceAtLeast(1) ?: 1,
+            isMoqEnabled = isMoqEnabled
         )
     }
 
@@ -447,6 +455,40 @@ fun ProductStudioContent(
                         IconButton(onClick = { lowStockAlert++ }) { Icon(Icons.Default.Add, null) }
                     }
                     StudioTextField("Location", location, { location = it })
+
+                    HorizontalDivider(color = Color(0xFFECECEC).copy(alpha = 0.5f))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Enable MOQ Control", Modifier.weight(1f), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Switch(checked = isMoqEnabled, onCheckedChange = { isMoqEnabled = it })
+                    }
+
+                    if (isMoqEnabled) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StudioTextField(
+                                label = "Customer MOQ",
+                                value = moq,
+                                onValueChange = { newValue ->
+                                    if (newValue.isEmpty() || (newValue.toIntOrNull() != null && newValue.toInt() >= 0)) {
+                                        moq = newValue
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                keyboardType = KeyboardType.Number
+                            )
+                            StudioTextField(
+                                label = "Dealer MOQ",
+                                value = dealerMoq,
+                                onValueChange = { newValue ->
+                                    if (newValue.isEmpty() || (newValue.toIntOrNull() != null && newValue.toInt() >= 0)) {
+                                        dealerMoq = newValue
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                keyboardType = KeyboardType.Number
+                            )
+                        }
+                    }
                 }
             }
 

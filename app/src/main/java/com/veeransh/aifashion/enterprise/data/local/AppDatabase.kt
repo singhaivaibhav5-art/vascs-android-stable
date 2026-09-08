@@ -22,7 +22,7 @@ import com.veeransh.aifashion.enterprise.data.local.entity.*
         StockTransactionEntity::class,
         StockBalanceEntity::class
     ],
-    version = 13,
+    version = 15,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -171,6 +171,21 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                 // Add status column to products for lifecycle management (Phase 3.4.2A)
                 db.execSQL("ALTER TABLE products ADD COLUMN status TEXT NOT NULL DEFAULT 'ACTIVE'")
+            }
+        }
+
+        val MIGRATION_14_15 = object : androidx.room.migration.Migration(14, 15) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // Add videosJson column for persistent product video support (Phase 3.3.6)
+                db.execSQL("ALTER TABLE products ADD COLUMN videosJson TEXT NOT NULL DEFAULT '[]'")
+            }
+        }
+
+        val MIGRATION_15_16 = object : androidx.room.migration.Migration(15, 16) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // Add Dealer MOQ and MOQ toggle support (Phase 3.4.3A)
+                db.execSQL("ALTER TABLE products ADD COLUMN dealerMoq INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE products ADD COLUMN isMoqEnabled INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

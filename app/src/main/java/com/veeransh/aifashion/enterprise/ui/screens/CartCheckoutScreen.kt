@@ -43,6 +43,7 @@ fun CartCheckoutScreen(
     onOrderPlaced: () -> Unit
 ) {
     val cartItems by viewModel.cartItems.collectAsState()
+    val isDealer by viewModel.isDealer.collectAsState()
     val orderState by orderViewModel.orderState.collectAsState()
     var showSuccessDialog by remember { mutableStateOf<String?>(null) }
     var lastTotal by remember { mutableDoubleStateOf(0.0) }
@@ -56,12 +57,25 @@ fun CartCheckoutScreen(
         }
     }
 
+    // Validation Logic (Phase 3.4.3B)
+    val invalidItems = remember(cartItems, isDealer) {
+        cartItems.filter { item ->
+            val effectiveMin = if (!item.product.isMoqEnabled) 1
+                             else if (isDealer) item.product.dealerMoq
+                             else item.product.moq
+            
+            item.qty < effectiveMin || item.qty > item.product.stock
+        }
+    }
+
     CartCheckoutContent(
         cartItems = cartItems,
+        isDealer = isDealer,
+        invalidItems = invalidItems,
         orderState = orderState,
         onNavigateBack = onNavigateBack,
         onPlaceOrder = { total, cartCoupon ->
-             if (cartItems.isNotEmpty() && orderState !is OrderState.Loading) {
+             if (cartItems.isNotEmpty() && invalidItems.isEmpty() && orderState !is OrderState.Loading) {
                  lastTotal = total
                  val timestamp = SimpleDateFormat("HHmmss", Locale.getDefault()).format(Date())
                  val orderNumber = "ORD-2026-$timestamp-${(10..99).random()}"
@@ -86,6 +100,8 @@ fun CartCheckoutScreen(
 @Composable
 fun CartCheckoutContent(
     cartItems: List<CartItem>,
+    isDealer: Boolean = false,
+    invalidItems: List<CartItem> = emptyList(),
     orderState: OrderState,
     onNavigateBack: () -> Unit,
     onPlaceOrder: (Double, UserPDPCouponItem?) -> Unit
@@ -156,7 +172,8 @@ fun CartCheckoutContent(
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(cartItems) { item ->
-                            CartItemCard(item, maroon, brandBorder, darkText)
+                            val isInvalid = invalidItems.contains(item)
+                            CartItemCard(item, isDealer, isInvalid, maroon, brandBorder, darkText)
                         }
                         
                         item {
@@ -177,6 +194,29 @@ fun CartCheckoutContent(
 
             // RIGHT - CHECKOUT SUMMARY (0.9fr)
             Column(modifier = Modifier.weight(0.9f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                // Validation Warning (Phase 3.4.3B)
+                if (invalidItems.isNotEmpty()) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFEAEA)),
+                        border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("VALIDATION REQUIRED", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.Red)
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Some items in your cart do not meet minimum quantity requirements or exceed available stock. Please correct them to proceed.",
+                                fontSize = 11.sp,
+                                color = Color.Red.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+
                 // Tier 2 Cart-Level Coupons
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -261,7 +301,7 @@ fun CartCheckoutContent(
                             modifier = Modifier.fillMaxWidth().height(52.dp),
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = maroon),
-                            enabled = cartItems.isNotEmpty() && orderState !is OrderState.Loading
+                            enabled = cartItems.isNotEmpty() && invalidItems.isEmpty() && orderState !is OrderState.Loading
                         ) {
                             if (orderState is OrderState.Loading) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
@@ -291,83 +331,117 @@ fun CartCheckoutContent(
 }
 
 @Composable
-fun CartItemCard(item: CartItem, maroon: Color, border: Color, darkText: Color) {
+fun CartItemCard(
+    item: CartItem, 
+    isDealer: Boolean, 
+    isInvalid: Boolean,
+    maroon: Color, 
+    border: Color, 
+    darkText: Color
+) {
+    val effectiveMin = if (!item.product.isMoqEnabled) 1
+                     else if (isDealer) item.product.dealerMoq
+                     else item.product.moq
+                     
+    val errorText = when {
+        item.qty < effectiveMin -> "Min qty required: $effectiveMin (Current: ${item.qty})"
+        item.qty > item.product.stock -> "Exceeds available stock: ${item.product.stock}"
+        else -> null
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, border),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFafB))
+        border = BorderStroke(1.dp, if (isInvalid) Color.Red else border),
+        colors = CardDefaults.cardColors(containerColor = if (isInvalid) Color(0xFFFFF6F6) else Color(0xFFFFFafB))
     ) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            // Tiny thumbnail
-            AsyncImage(
-                model = item.product.image,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White),
-                contentScale = ContentScale.Crop
-            )
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Text(item.product.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = darkText)
-                if (item.appliedCoupon != null) {
-                    val itemDiscount = when (item.appliedCoupon.type) {
-                        "PERCENT" -> (item.product.retailPrice * (item.appliedCoupon.value / 100.0)).roundToInt().toDouble()
-                        "FIXED" -> item.appliedCoupon.value
-                        else -> 0.0
-                    }
-                    Text(
-                        "${item.appliedCoupon.code} applied • Sale ₹${item.product.retailPrice.toInt()} → ₹${(item.product.retailPrice - itemDiscount).toInt()}",
-                        fontSize = 10.sp,
-                        color = Color.Gray.copy(alpha = 0.7f)
-                    )
-                }
+        Column {
+            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Tiny thumbnail
+                AsyncImage(
+                    model = item.product.image,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.White),
+                    contentScale = ContentScale.Crop
+                )
                 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.width(16.dp))
                 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val itemDiscount = when (item.appliedCoupon?.type) {
-                        "PERCENT" -> (item.product.retailPrice * (item.appliedCoupon.value / 100.0)).roundToInt().toDouble()
-                        "FIXED" -> item.appliedCoupon.value
-                        else -> 0.0
-                    }
-                    val discountedPrice = item.product.retailPrice - itemDiscount
-                    
-                    Text("₹${discountedPrice.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = darkText)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(item.product.name, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = darkText)
                     if (item.appliedCoupon != null) {
-                        Spacer(modifier = Modifier.width(8.dp))
+                        val itemDiscount = when (item.appliedCoupon.type) {
+                            "PERCENT" -> (item.product.retailPrice * (item.appliedCoupon.value / 100.0)).roundToInt().toDouble()
+                            "FIXED" -> item.appliedCoupon.value
+                            else -> 0.0
+                        }
                         Text(
-                            "₹${item.product.retailPrice.toInt()}",
-                            fontSize = 11.sp,
-                            textDecoration = TextDecoration.LineThrough,
-                            color = Color.Gray.copy(alpha = 0.4f)
+                            "${item.appliedCoupon.code} applied • Sale ₹${item.product.retailPrice.toInt()} → ₹${(item.product.retailPrice - itemDiscount).toInt()}",
+                            fontSize = 10.sp,
+                            color = Color.Gray.copy(alpha = 0.7f)
                         )
                     }
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val itemDiscount = when (item.appliedCoupon?.type) {
+                            "PERCENT" -> (item.product.retailPrice * (item.appliedCoupon.value / 100.0)).roundToInt().toDouble()
+                            "FIXED" -> item.appliedCoupon.value
+                            else -> 0.0
+                        }
+                        val discountedPrice = item.product.retailPrice - itemDiscount
+                        
+                        Text("₹${discountedPrice.toInt()}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = darkText)
+                        if (item.appliedCoupon != null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "₹${item.product.retailPrice.toInt()}",
+                                fontSize = 11.sp,
+                                textDecoration = TextDecoration.LineThrough,
+                                color = Color.Gray.copy(alpha = 0.4f)
+                            )
+                        }
+                    }
+                }
+                
+                Column(horizontalAlignment = Alignment.End) {
+                    if (item.appliedCoupon != null) {
+                        Surface(
+                            border = BorderStroke(1.dp, border),
+                            shape = RoundedCornerShape(6.dp),
+                            color = maroon.copy(alpha = 0.1f)
+                        ) {
+                            Text(
+                                item.appliedCoupon.code, 
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                fontSize = 9.sp, 
+                                fontWeight = FontWeight.Bold,
+                                color = maroon
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Qty: ${item.qty}", fontSize = 11.sp, fontWeight = FontWeight.Black, color = if(isInvalid) Color.Red else darkText)
                 }
             }
-            
-            Column(horizontalAlignment = Alignment.End) {
-                if (item.appliedCoupon != null) {
-                    Surface(
-                        border = BorderStroke(1.dp, border),
-                        shape = RoundedCornerShape(6.dp),
-                        color = maroon.copy(alpha = 0.1f)
-                    ) {
-                        Text(
-                            item.appliedCoupon.code, 
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            fontSize = 9.sp, 
-                            fontWeight = FontWeight.Bold,
-                            color = maroon
-                        )
-                    }
+
+            if (isInvalid && errorText != null) {
+                Surface(
+                    color = Color.Red,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = errorText.uppercase(),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Qty: ${item.qty}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

@@ -35,5 +35,8 @@ data class ProductEntity(
     val description: String = "",
     val tags: String = "",
     val createdAt: String = "",
-    val status: String = "ACTIVE" // DRAFT, ACTIVE, ARCHIVED
+    val status: String = "ACTIVE", // DRAFT, ACTIVE, ARCHIVED
+    val videosJson: String = "[]",
+    val dealerMoq: Int = 1,
+    val isMoqEnabled: Boolean = false
 )

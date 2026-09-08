@@ -35,6 +35,16 @@ class OrderRepository @Inject constructor(
 
                     // Fetch Product Master for initial stock and cost snapshot
                     val p = productDao.getById(item.productId) ?: throw Exception("Product not found: ${item.productId}")
+
+                    // Final MOQ Guard (Phase 3.4.4)
+                    val effectiveMin = if (!p.isMoqEnabled) 1
+                                     else if (order.dealerId.isNotBlank()) p.dealerMoq
+                                     else p.moq
+
+                    if (item.qty < effectiveMin) {
+                        throw IllegalArgumentException("Minimum quantity for ${p.name} is $effectiveMin. (Requested: ${item.qty})")
+                    }
+
                     val beforeStock = p.stock
 
                     // A. Deduct ProductEntity.stock (Operational Cache)
@@ -46,7 +56,7 @@ class OrderRepository @Inject constructor(
                     // B. Manage StockBalanceEntity (Operational Balance)
                     val locationId = "" // Default global location
                     var balanceRecord = stockBalanceDao.getBalance(item.productId, locationId)
-                    
+
                     if (balanceRecord == null) {
                         // INITIALIZATION: Sync with current Master Stock if missing
                         stockBalanceDao.insert(StockBalanceEntity(

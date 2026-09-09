@@ -84,6 +84,7 @@ fun AdminDashboardScreenContent(
                 AdminMenuItem("Orders", Icons.Default.ShoppingCart),
                 AdminMenuItem("Finance", Icons.Default.AccountBalance),
                 AdminMenuItem("Reports", Icons.Default.Assessment),
+                AdminMenuItem("Requirements", Icons.Default.EditNote),
                 AdminMenuItem("AI Config", Icons.Default.SettingsSuggest),
                 AdminMenuItem("Settings", Icons.Default.Settings)
             )
@@ -142,6 +143,12 @@ fun AdminDashboardScreenContent(
                                 onSuspend = { _, _, _ -> }
                             )
                         }
+                    }
+                    "Requirements" -> {
+                        com.veeransh.aifashion.enterprise.ui.requirements.AdminRequirementListScreen(
+                            onBack = { selectedMenuItem = "Dashboard" },
+                            onRequirementClick = { /* detail later */ }
+                        )
                     }
                     "Approvals" -> ApprovalsView(
                         pendingApprovals = pendingApprovals,

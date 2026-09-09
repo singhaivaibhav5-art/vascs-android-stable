@@ -20,5 +20,7 @@ data class UserEntity(
     val suspendedTill: Long = 0,
     val kycStatus: String = "NONE", // NONE, PENDING, VERIFIED, REJECTED
     val createdDate: Long = System.currentTimeMillis(),
-    val lastLoginTimestamp: Long = 0
+    val lastLoginTimestamp: Long = 0,
+    val referralCode: String = "",
+    val referredBy: String = ""
 )

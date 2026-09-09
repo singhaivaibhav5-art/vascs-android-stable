@@ -44,7 +44,8 @@ import kotlin.math.roundToInt
 fun UserPDPDetailScreen(
     productId: String,
     viewModel: HomeViewModel = hiltViewModel(),
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onRequirementClick: (String) -> Unit = {}
 ) {
     val products by viewModel.products.collectAsState()
     val product = products.find { it.id == productId }
@@ -68,7 +69,8 @@ fun UserPDPDetailScreen(
             },
             isDealer = isDealer,
             quantity = quantity,
-            onQuantityChange = { quantity = it }
+            onQuantityChange = { quantity = it },
+            onRequirementClick = onRequirementClick
         )
     } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -85,7 +87,8 @@ fun UserPDPDetailContent(
     onAddToCart: (ProductEntity, UserPDPCouponItem?) -> Unit,
     isDealer: Boolean = false,
     quantity: Int = 1,
-    onQuantityChange: (Int) -> Unit = {}
+    onQuantityChange: (Int) -> Unit = {},
+    onRequirementClick: (String) -> Unit = {}
 ) {
     val maroon = Color(0xFF7A0C20)
     val gold = Color(0xFFD4AF37)
@@ -147,9 +150,9 @@ fun UserPDPDetailContent(
                     .verticalScroll(rememberScrollState())
             ) {
                 if (isWide) {
-                    WidePDPLayout(product, isDealer, quantity, onQuantityChange, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, { selectedCouponCode = it })
+                    WidePDPLayout(product, isDealer, quantity, onQuantityChange, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, onRequirementClick, { selectedCouponCode = it })
                 } else {
-                    MobilePDPLayout(product, isDealer, quantity, onQuantityChange, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, { selectedCouponCode = it })
+                    MobilePDPLayout(product, isDealer, quantity, onQuantityChange, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, onRequirementClick, { selectedCouponCode = it })
                 }
                 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -178,6 +181,7 @@ fun MobilePDPLayout(
     brandBorder: Color,
     darkText: Color,
     onAddToCart: (ProductEntity, UserPDPCouponItem?) -> Unit,
+    onRequirementClick: (String) -> Unit,
     onCouponSelect: (String) -> Unit
 ) {
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -197,7 +201,7 @@ fun MobilePDPLayout(
         }
         
         // Content
-        PDPContentSection(product, isDealer, quantity, onQuantityChange, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, onCouponSelect)
+        PDPContentSection(product, isDealer, quantity, onQuantityChange, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, onRequirementClick, onCouponSelect)
     }
 }
 
@@ -221,6 +225,7 @@ fun WidePDPLayout(
     brandBorder: Color,
     darkText: Color,
     onAddToCart: (ProductEntity, UserPDPCouponItem?) -> Unit,
+    onRequirementClick: (String) -> Unit,
     onCouponSelect: (String) -> Unit
 ) {
     Row(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
@@ -232,7 +237,7 @@ fun WidePDPLayout(
             }
         }
         Column(modifier = Modifier.weight(1f)) {
-            PDPContentSection(product, isDealer, quantity, onQuantityChange, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, onCouponSelect)
+            PDPContentSection(product, isDealer, quantity, onQuantityChange, basePrice, finalPrice, discountValue, availableCoupons, selectedCouponCode, selectedCoupon, maroon, gold, lightBg, lightMaroon, borderMaroon, brandBorder, darkText, onAddToCart, onRequirementClick, onCouponSelect)
         }
     }
 }
@@ -257,6 +262,7 @@ fun PDPContentSection(
     brandBorder: Color,
     darkText: Color,
     onAddToCart: (ProductEntity, UserPDPCouponItem?) -> Unit,
+    onRequirementClick: (String) -> Unit,
     onCouponSelect: (String) -> Unit
 ) {
     // MOQ Logic
@@ -436,6 +442,19 @@ fun PDPContentSection(
                 ) {
                     Icon(Icons.Default.ShoppingBag, contentDescription = "Bag", modifier = Modifier.size(18.dp), tint = darkText)
                 }
+            }
+
+            // REQUIREMENT ACTION
+            OutlinedButton(
+                onClick = { onRequirementClick(product.id) },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(1.dp, maroon),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = maroon)
+            ) {
+                Icon(Icons.Default.EditNote, null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("SUBMIT REQUIREMENT", fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
         }
 

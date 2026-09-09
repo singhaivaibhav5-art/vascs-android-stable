@@ -32,7 +32,9 @@ object DatabaseModule {
             AppDatabase.MIGRATION_12_13,
             AppDatabase.MIGRATION_13_14,
             AppDatabase.MIGRATION_14_15,
-            AppDatabase.MIGRATION_15_16
+            AppDatabase.MIGRATION_15_16,
+            AppDatabase.MIGRATION_16_17,
+            AppDatabase.MIGRATION_17_18
         ).build()
     }
 
@@ -68,4 +70,7 @@ object DatabaseModule {
 
     @Provides
     fun provideStockBalanceDao(db: AppDatabase): StockBalanceDao = db.stockBalanceDao()
+
+    @Provides
+    fun provideRequirementDao(db: AppDatabase): RequirementDao = db.requirementDao()
 }

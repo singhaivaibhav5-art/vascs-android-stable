@@ -47,7 +47,7 @@ fun SuperAdminDashboard(
     val tabs = listOf(
         "Login", "PIN", "Roles", "Users", "Perms", 
         "COD", "Payment", "Display", "Templates", "Coupon", 
-        "Pincode", "Return", "AI", "B2B", "System", "Logs"
+        "Pincode", "Return", "AI", "B2B", "Requirements", "System", "Logs"
     )
 
     Scaffold(
@@ -142,8 +142,12 @@ fun SuperAdminDashboard(
                         11 -> ReturnTab()
                         12 -> AITab(viewModel)
                         13 -> B2BTab()
-                        14 -> SystemTab(viewModel, snackbarHostState)
-                        15 -> LogsTab(viewModel)
+                        14 -> com.veeransh.aifashion.enterprise.ui.requirements.AdminRequirementListScreen(
+                            onBack = { selectedTabIndex = 0 },
+                            onRequirementClick = { /* detail later */ }
+                        )
+                        15 -> SystemTab(viewModel, snackbarHostState)
+                        16 -> LogsTab(viewModel)
                     }
                 }
             }

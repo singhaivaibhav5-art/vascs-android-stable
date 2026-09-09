@@ -20,9 +20,10 @@ import com.veeransh.aifashion.enterprise.data.local.entity.*
         AiDrapeResultEntity::class,
         PlacementEntity::class,
         StockTransactionEntity::class,
-        StockBalanceEntity::class
+        StockBalanceEntity::class,
+        CustomerRequirementEntity::class
     ],
-    version = 16,
+    version = 18,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -38,6 +39,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun placementDao(): PlacementDao
     abstract fun stockTransactionDao(): StockTransactionDao
     abstract fun stockBalanceDao(): StockBalanceDao
+    abstract fun requirementDao(): RequirementDao
 
     companion object {
         val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
@@ -186,6 +188,21 @@ abstract class AppDatabase : RoomDatabase() {
                 // Add Dealer MOQ and MOQ toggle support (Phase 3.4.3A)
                 db.execSQL("ALTER TABLE products ADD COLUMN dealerMoq INTEGER NOT NULL DEFAULT 1")
                 db.execSQL("ALTER TABLE products ADD COLUMN isMoqEnabled INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_16_17 = object : androidx.room.migration.Migration(16, 17) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // Create customer_requirements table for Phase 3.4.5
+                db.execSQL("CREATE TABLE IF NOT EXISTS `customer_requirements` (`requirementId` TEXT NOT NULL, `userId` TEXT NOT NULL, `userName` TEXT NOT NULL, `userPhone` TEXT NOT NULL, `userEmail` TEXT NOT NULL, `productId` TEXT NOT NULL, `productName` TEXT NOT NULL, `productSku` TEXT NOT NULL, `quantity` INTEGER NOT NULL, `description` TEXT NOT NULL, `imageUrisJson` TEXT NOT NULL DEFAULT '[]', `supportMediaUrisJson` TEXT NOT NULL DEFAULT '[]', `status` TEXT NOT NULL DEFAULT 'PENDING', `adminNotes` TEXT NOT NULL DEFAULT '', `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`requirementId`))")
+            }
+        }
+
+        val MIGRATION_17_18 = object : androidx.room.migration.Migration(17, 18) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // Add referral fields to users table (Phase 3.4.6)
+                db.execSQL("ALTER TABLE users ADD COLUMN referralCode TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE users ADD COLUMN referredBy TEXT NOT NULL DEFAULT ''")
             }
         }
     }

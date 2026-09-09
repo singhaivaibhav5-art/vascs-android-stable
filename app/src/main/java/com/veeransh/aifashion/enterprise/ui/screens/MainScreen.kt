@@ -171,6 +171,7 @@ fun MainScreenContent(
                                         "B2B Portal" -> "placeholder/B2B Portal"
                                         "Style Partner" -> "ewallet"
                                         "Admin Control" -> "adminControl"
+                                        "Requirements" -> "adminRequirements"
                                         "Dispatch" -> "placeholder/Dispatch"
                                         else -> "home"
                                     }
@@ -217,9 +218,21 @@ fun MainScreenContent(
                             UserPDPDetailScreen(
                                 productId = productId,
                                 viewModel = homeViewModel,
-                                onBack = { navController.popBackStack() }
+                                onBack = { navController.popBackStack() },
+                                onRequirementClick = { id ->
+                                    navController.navigate("requirementForm/$id")
+                                }
                             )
                         }
+                    }
+                    composable("requirementForm/{productId}") { backStackEntry ->
+                        val productId = backStackEntry.arguments?.getString("productId") ?: ""
+                        val userId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                        com.veeransh.aifashion.enterprise.ui.requirements.RequirementFormScreen(
+                            productId = productId,
+                            userId = userId,
+                            onBack = { navController.popBackStack() }
+                        )
                     }
                     composable("cart") {
                         if (homeViewModel != null && orderViewModel != null) {
@@ -305,6 +318,14 @@ fun MainScreenContent(
                     }
                     composable("adminSearchBlock") {
                         UserSearchBlockPanel()
+                    }
+                    composable("adminRequirements") {
+                        com.veeransh.aifashion.enterprise.ui.requirements.AdminRequirementListScreen(
+                            onBack = { navController.popBackStack() },
+                            onRequirementClick = { id ->
+                                // Navigation to detail to be implemented in Phase 3.4.6
+                            }
+                        )
                     }
                     composable("super_admin") {
                         SuperAdminDashboard(navController = navController)

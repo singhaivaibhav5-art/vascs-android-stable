@@ -36,6 +36,7 @@ fun ERPToolsGrid(
         ERPTool("Orders", Icons.Default.ShoppingBag),
         ERPTool("B2B Portal", Icons.Default.Store),
         ERPTool("Style Partner", Icons.Default.Diamond),
+        ERPTool("Requirements", Icons.Default.EditNote),
         ERPTool("Admin Control", Icons.Default.AdminPanelSettings),
         ERPTool("Dispatch", Icons.Default.LocalShipping)
     )

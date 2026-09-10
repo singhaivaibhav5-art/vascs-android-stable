@@ -16,11 +16,27 @@ import javax.inject.Inject
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val auth: FirebaseAuth,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val userRepository: com.veeransh.aifashion.enterprise.data.repository.UserRepository
 ) : ViewModel() {
 
-    private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
+    private val _authState = MutableStateFlow<AuthState>(if (auth.currentUser != null) AuthState.Authenticated else AuthState.Idle)
     val authState = _authState.asStateFlow()
+
+    private val _currentUser = MutableStateFlow<com.veeransh.aifashion.enterprise.data.local.entity.UserEntity?>(null)
+    val currentUser = _currentUser.asStateFlow()
+
+    init {
+        auth.currentUser?.uid?.let { uid ->
+            loadUserEntity(uid)
+        }
+    }
+
+    private fun loadUserEntity(uid: String) {
+        viewModelScope.launch {
+            _currentUser.value = userRepository.getUserById(uid)
+        }
+    }
 
     private val _otpSent = MutableStateFlow(false)
     val otpSent = _otpSent.asStateFlow()
@@ -78,8 +94,10 @@ class AuthViewModel @Inject constructor(
             _authState.value = AuthState.Loading
             auth.signInWithCredential(credential)
                 .addOnSuccessListener {
+                    val uid = it.user?.uid ?: ""
                     _authState.value = AuthState.Authenticated
-                    checkUserRecord(it.user?.uid ?: "")
+                    loadUserEntity(uid)
+                    checkUserRecord(uid)
                 }
                 .addOnFailureListener {
                     _authState.value = AuthState.Error(it.message ?: "Login failed")
@@ -94,7 +112,9 @@ class AuthViewModel @Inject constructor(
             // For now, using standard Firebase Auth which handles its own hashing
             auth.signInWithEmailAndPassword(email, password)
                 .addOnSuccessListener {
+                    val uid = it.user?.uid ?: ""
                     _authState.value = AuthState.Authenticated
+                    loadUserEntity(uid)
                 }
                 .addOnFailureListener {
                     _authState.value = AuthState.Error("Invalid credentials")
@@ -121,6 +141,7 @@ class AuthViewModel @Inject constructor(
                 firestore.collection("users").document(uid).set(user)
                     .addOnSuccessListener {
                         _authState.value = AuthState.Authenticated
+                        loadUserEntity(uid)
                     }
             }
         }
@@ -137,6 +158,12 @@ class AuthViewModel @Inject constructor(
 
     fun resetPassword(email: String) {
         auth.sendPasswordResetEmail(email)
+    }
+
+    fun signOut() {
+        auth.signOut()
+        _currentUser.value = null
+        _authState.value = AuthState.Idle
     }
 }
 

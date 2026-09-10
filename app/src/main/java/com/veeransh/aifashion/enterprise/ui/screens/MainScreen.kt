@@ -39,29 +39,40 @@ import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
 fun MainScreen(
+    authViewModel: com.veeransh.aifashion.enterprise.ui.auth.AuthViewModel = hiltViewModel(),
     homeViewModel: HomeViewModel = hiltViewModel(),
     orderViewModel: OrderViewModel = hiltViewModel(),
     walletViewModel: WalletViewModel = hiltViewModel()
 ) {
-    val products by homeViewModel.products.collectAsState()
-    val orders by orderViewModel.orders.collectAsState()
-    val cartItems by homeViewModel.cartItems.collectAsState()
-    
-    var isAdmin by remember { mutableStateOf(false) }
-    var isDealer by remember { mutableStateOf(true) }
-    
-    MainScreenContent(
-        isAdmin = isAdmin,
-        isDealer = isDealer,
-        products = products,
-        orders = orders,
-        onAdminPinSuccess = { isAdmin = true },
-        onLogout = { isAdmin = false },
-        onSaveProduct = { product -> homeViewModel.saveProduct(product) },
-        homeViewModel = homeViewModel,
-        orderViewModel = orderViewModel,
-        walletViewModel = walletViewModel
-    )
+    val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+    val authState by authViewModel.authState.collectAsState()
+
+    if (currentUser == null && authState !is com.veeransh.aifashion.enterprise.ui.auth.AuthState.Authenticated) {
+        AuthScreen(onAuthSuccess = { })
+    } else {
+        val products by homeViewModel.products.collectAsState()
+        val orders by orderViewModel.orders.collectAsState()
+        val cartItems by homeViewModel.cartItems.collectAsState()
+        
+        var isAdmin by remember { mutableStateOf(false) }
+        var isDealer by remember { mutableStateOf(true) }
+        
+        MainScreenContent(
+            isAdmin = isAdmin,
+            isDealer = isDealer,
+            products = products,
+            orders = orders,
+            onAdminPinSuccess = { isAdmin = true },
+            onLogout = { 
+                isAdmin = false
+                authViewModel.signOut()
+            },
+            onSaveProduct = { product -> homeViewModel.saveProduct(product) },
+            homeViewModel = homeViewModel,
+            orderViewModel = orderViewModel,
+            walletViewModel = walletViewModel
+        )
+    }
 }
 
 @Composable

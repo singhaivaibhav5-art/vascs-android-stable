@@ -44,27 +44,26 @@ fun MainScreen(
     orderViewModel: OrderViewModel = hiltViewModel(),
     walletViewModel: WalletViewModel = hiltViewModel()
 ) {
-    val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
     val authState by authViewModel.authState.collectAsState()
+    val user by authViewModel.currentUser.collectAsState()
 
-    if (currentUser == null && authState !is com.veeransh.aifashion.enterprise.ui.auth.AuthState.Authenticated) {
+    if (authState !is com.veeransh.aifashion.enterprise.ui.auth.AuthState.Authenticated) {
         AuthScreen(onAuthSuccess = { })
     } else {
         val products by homeViewModel.products.collectAsState()
         val orders by orderViewModel.orders.collectAsState()
         val cartItems by homeViewModel.cartItems.collectAsState()
         
-        var isAdmin by remember { mutableStateOf(false) }
-        var isDealer by remember { mutableStateOf(true) }
+        val isAdmin = user?.role == "admin"
+        val isDealer = user?.role == "dealer" || user?.role == "stylePartner"
         
         MainScreenContent(
             isAdmin = isAdmin,
             isDealer = isDealer,
             products = products,
             orders = orders,
-            onAdminPinSuccess = { isAdmin = true },
+            onAdminPinSuccess = { },
             onLogout = { 
-                isAdmin = false
                 authViewModel.signOut()
             },
             onSaveProduct = { product -> homeViewModel.saveProduct(product) },

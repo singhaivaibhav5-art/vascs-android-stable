@@ -28,14 +28,51 @@ class AuthViewModel @Inject constructor(
 
     init {
         auth.currentUser?.uid?.let { uid ->
-            loadUserEntity(uid)
+            syncAuthenticatedUser(uid)
         }
     }
 
-    private fun loadUserEntity(uid: String) {
-        viewModelScope.launch {
-            _currentUser.value = userRepository.getUserById(uid)
-        }
+    private fun syncAuthenticatedUser(uid: String) {
+        firestore.collection("users").document(uid).get()
+            .addOnSuccessListener { doc ->
+                if (doc.exists()) {
+                    val role = doc.getString("role") ?: "customer"
+                    val name = doc.getString("name") ?: doc.getString("phone") ?: "User"
+                    val phone = doc.getString("phone") ?: ""
+                    val email = doc.getString("email") ?: ""
+                    val status = doc.getString("status") ?: "active"
+                    val kycStatus = doc.getString("kycStatus") ?: "NONE"
+                    val is2FAEnabled = doc.getBoolean("twoFactorEnabled") ?: false
+                    val referralCode = doc.getString("referralCode") ?: ""
+                    val referredBy = doc.getString("referredBy") ?: ""
+                    val createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
+
+                    viewModelScope.launch {
+                        val entity = com.veeransh.aifashion.enterprise.data.local.entity.UserEntity(
+                            uid = uid,
+                            phone = phone,
+                            email = email,
+                            name = name,
+                            role = role,
+                            status = status,
+                            kycStatus = kycStatus,
+                            is2FAEnabled = is2FAEnabled,
+                            referralCode = referralCode,
+                            referredBy = referredBy,
+                            createdDate = createdAt,
+                            lastLoginTimestamp = System.currentTimeMillis()
+                        )
+                        userRepository.saveUser(entity)
+                        _currentUser.value = entity
+                        _authState.value = AuthState.Authenticated
+                    }
+                } else {
+                    _authState.value = AuthState.Error("User profile not found in cloud storage.")
+                }
+            }
+            .addOnFailureListener {
+                _authState.value = AuthState.Error(it.message ?: "Sync failed")
+            }
     }
 
     private val _otpSent = MutableStateFlow(false)
@@ -95,9 +132,7 @@ class AuthViewModel @Inject constructor(
             auth.signInWithCredential(credential)
                 .addOnSuccessListener {
                     val uid = it.user?.uid ?: ""
-                    _authState.value = AuthState.Authenticated
-                    loadUserEntity(uid)
-                    checkUserRecord(uid)
+                    syncAuthenticatedUser(uid)
                 }
                 .addOnFailureListener {
                     _authState.value = AuthState.Error(it.message ?: "Login failed")
@@ -113,8 +148,7 @@ class AuthViewModel @Inject constructor(
             auth.signInWithEmailAndPassword(email, password)
                 .addOnSuccessListener {
                     val uid = it.user?.uid ?: ""
-                    _authState.value = AuthState.Authenticated
-                    loadUserEntity(uid)
+                    syncAuthenticatedUser(uid)
                 }
                 .addOnFailureListener {
                     _authState.value = AuthState.Error("Invalid credentials")
@@ -125,35 +159,44 @@ class AuthViewModel @Inject constructor(
     fun signup(phone: String, email: String, password: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
+            val now = System.currentTimeMillis()
             // Hash password with 10 rounds
             val hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt(10))
             
-            // In V4, OTP is compulsory before this step normally, but here's the save logic
-            val user = hashMapOf(
+            val firestoreUser = hashMapOf(
+                "role" to "customer",
                 "phone" to phone,
                 "email" to email,
                 "password" to hashedPassword,
                 "twoFactorEnabled" to false,
-                "createdAt" to System.currentTimeMillis()
+                "createdAt" to now
             )
             
             auth.currentUser?.uid?.let { uid ->
-                firestore.collection("users").document(uid).set(user)
+                firestore.collection("users").document(uid).set(firestoreUser)
                     .addOnSuccessListener {
-                        _authState.value = AuthState.Authenticated
-                        loadUserEntity(uid)
+                        // Persist to Room for authoritative local role sync
+                        viewModelScope.launch {
+                            val entity = com.veeransh.aifashion.enterprise.data.local.entity.UserEntity(
+                                uid = uid,
+                                phone = phone,
+                                email = email,
+                                name = phone, // Default name to phone for initial setup
+                                passwordHash = hashedPassword,
+                                role = "customer",
+                                status = "active",
+                                createdDate = now
+                            )
+                            userRepository.saveUser(entity)
+                            _currentUser.value = entity
+                            _authState.value = AuthState.Authenticated
+                        }
+                    }
+                    .addOnFailureListener {
+                        _authState.value = AuthState.Error(it.message ?: "Signup failed")
                     }
             }
         }
-    }
-
-    private fun checkUserRecord(uid: String) {
-        firestore.collection("users").document(uid).get()
-            .addOnSuccessListener { doc ->
-                if (!doc.exists()) {
-                    // Navigate to profile completion if record missing
-                }
-            }
     }
 
     fun resetPassword(email: String) {

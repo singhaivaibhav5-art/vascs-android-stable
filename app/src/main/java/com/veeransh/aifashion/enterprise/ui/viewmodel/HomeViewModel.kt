@@ -5,10 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.veeransh.aifashion.enterprise.data.repository.ProductRepository
 import com.veeransh.aifashion.enterprise.data.repository.PlacementRepository
 import com.veeransh.aifashion.enterprise.data.repository.StockRepository
+import com.veeransh.aifashion.enterprise.data.repository.UserRepository
 import com.veeransh.aifashion.enterprise.data.local.entity.ProductEntity
 import com.veeransh.aifashion.enterprise.data.local.entity.PlacementEntity
 import com.veeransh.aifashion.enterprise.types.CartItem
 import com.veeransh.aifashion.enterprise.types.UserPDPCouponItem
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -16,27 +19,34 @@ import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val productRepository: ProductRepository,
     private val placementRepository: PlacementRepository,
-    private val stockRepository: StockRepository
+    private val stockRepository: StockRepository,
+    private val userRepository: UserRepository,
+    private val firebaseAuth: FirebaseAuth
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
-    // Role state for visibility filtering (Phase 3.4.2B)
-    private val _isAdmin = MutableStateFlow(false)
-    val isAdmin = _isAdmin.asStateFlow()
+    // Real Role Sync (Phase 3.4.6)
+    private val roleInfo = flow {
+        emit(firebaseAuth.currentUser?.uid)
+    }.flatMapLatest { uid ->
+        if (uid == null) flowOf(false to false)
+        else userRepository.allUsers.map { users ->
+            val user = users.find { it.uid == uid }
+            val admin = user?.role == "admin"
+            val dealer = user?.role == "dealer" || user?.role == "stylePartner"
+            admin to dealer
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false to false)
 
-    private val _isDealer = MutableStateFlow(false)
-    val isDealer = _isDealer.asStateFlow()
-
-    fun updateRoles(admin: Boolean, dealer: Boolean) {
-        _isAdmin.value = admin
-        _isDealer.value = dealer
-    }
+    val isAdmin = roleInfo.map { it.first }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val isDealer = roleInfo.map { it.second }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val products: StateFlow<List<ProductEntity>> = productRepository.allProducts.stateIn(
         scope = viewModelScope,
@@ -45,8 +55,9 @@ class HomeViewModel @Inject constructor(
     )
 
     val filteredProducts: StateFlow<List<ProductEntity>> = combine(
-        products, _searchQuery, _isAdmin, _isDealer
-    ) { list, query, admin, dealer ->
+        products, _searchQuery, roleInfo
+    ) { list, query, roles ->
+        val (admin, dealer) = roles
         list.filter { product ->
             // 1. Visibility Rule: Status + Stock based on Role
             val isVisible = if (admin || dealer) {
@@ -71,9 +82,9 @@ class HomeViewModel @Inject constructor(
     val activePlacements: StateFlow<List<PlacementWithProduct>> = combine(
         placementRepository.observeAllActivePlacements(),
         products,
-        _isAdmin,
-        _isDealer
-    ) { placements, productList, admin, dealer ->
+        roleInfo
+    ) { placements, productList, roles ->
+        val (admin, dealer) = roles
         val currentTime = System.currentTimeMillis()
         placements
             .filter { it.status == "Published" }

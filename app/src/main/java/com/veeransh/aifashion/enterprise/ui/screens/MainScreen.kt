@@ -49,21 +49,33 @@ fun MainScreen(
 
     if (authState !is com.veeransh.aifashion.enterprise.ui.auth.AuthState.Authenticated) {
         AuthScreen(onAuthSuccess = { })
+    } else if (user == null) {
+        // Auth is verified but local UserEntity is still loading from Room/Firestore
+        Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF5F1E8)), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = Color(0xFF0D5C36))
+        }
+    } else if (user?.status != "active") {
+        // SECURITY GUARD: Account is suspended, blocked, or in an invalid state
+        AccountStatusBlockScreen(
+            status = user?.status ?: "unknown",
+            onLogout = { authViewModel.signOut() }
+        )
     } else {
         val products by homeViewModel.products.collectAsState()
         val orders by orderViewModel.orders.collectAsState()
         val cartItems by homeViewModel.cartItems.collectAsState()
-        
+
         val isAdmin = user?.role == "admin"
         val isDealer = user?.role == "dealer" || user?.role == "stylePartner"
-        
+
         MainScreenContent(
             isAdmin = isAdmin,
             isDealer = isDealer,
+            user = user,
             products = products,
             orders = orders,
             onAdminPinSuccess = { },
-            onLogout = { 
+            onLogout = {
                 authViewModel.signOut()
             },
             onSaveProduct = { product -> homeViewModel.saveProduct(product) },
@@ -75,9 +87,77 @@ fun MainScreen(
 }
 
 @Composable
+fun AccountStatusBlockScreen(status: String, onLogout: () -> Unit) {
+    val title = when (status) {
+        "suspended" -> "Account Suspended"
+        "blocked" -> "Account Blocked"
+        else -> "Access Restricted"
+    }
+
+    val message = when (status) {
+        "suspended" -> "Your access to Veeransh AI Fashion has been temporarily suspended due to a policy violation or pending verification."
+        "blocked" -> "This account has been permanently blocked by system administration."
+        else -> "Your account status ($status) does not permit access to the enterprise tools at this time."
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF5F1E8))
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.GppBad,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = Color(0xFF7A0C20)
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = title,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF7A0C20)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = message,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    color = Color.Gray,
+                    lineHeight = 20.sp,
+                    fontSize = 14.sp
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(
+                    onClick = onLogout,
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7A0C20)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Logout and Exit", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun MainScreenContent(
     isAdmin: Boolean,
     isDealer: Boolean,
+    user: com.veeransh.aifashion.enterprise.data.local.entity.UserEntity?,
     products: List<ProductEntity>,
     orders: List<OrderMasterEntity>,
     onAdminPinSuccess: () -> Unit,
@@ -91,10 +171,10 @@ fun MainScreenContent(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var showAdminPinDialog by remember { mutableStateOf(false) }
-    
+
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    
+
     if (showAdminPinDialog) {
         AdminPinDialog(
             onDismiss = { showAdminPinDialog = false },
@@ -120,7 +200,7 @@ fun MainScreenContent(
                         BottomNavItem("Analytics", "analytics", Icons.Default.BarChart),
                         BottomNavItem("Profile", "profile", Icons.Default.Person)
                     )
-                    
+
                     items.forEach { item ->
                         NavigationBarItem(
                             selected = currentDestination?.hierarchy?.any { it.route == item.route } == true,
@@ -260,14 +340,14 @@ fun MainScreenContent(
                         }
                     }
                     composable("finance") { FinanceScreen() }
-                    composable("inventory") { 
+                    composable("inventory") {
                         if (homeViewModel != null) {
                             InventoryScreen(
                                 viewModel = homeViewModel,
                                 onNavigateToHistory = { productId ->
                                     navController.navigate("stockHistory/$productId")
                                 }
-                            ) 
+                            )
                         }
                     }
                     composable("stockHistory/{productId}") { backStackEntry ->
@@ -285,7 +365,7 @@ fun MainScreenContent(
                             )
                         }
                     }
-                    composable("sales") { 
+                    composable("sales") {
                         if (homeViewModel != null && orderViewModel != null) {
                             SalesScreen(
                                 viewModel = homeViewModel,
@@ -294,7 +374,7 @@ fun MainScreenContent(
                             )
                         }
                     }
-                    composable("orders") { 
+                    composable("orders") {
                         if (orderViewModel != null) {
                             OrdersScreen(
                                 viewModel = orderViewModel,
@@ -320,10 +400,16 @@ fun MainScreenContent(
                     composable("categories") { PlaceholderScreen("Categories") }
                     composable("ai_center") { PlaceholderScreen("AI Center") }
                     composable("analytics") { PlaceholderScreen("Analytics") }
-                    composable("profile") { PlaceholderScreen("User Profile - Logout in Admin Sidebar") }
+                    composable("profile") {
+                        com.veeransh.aifashion.enterprise.ui.profile.UserProfileScreen(
+                            user = user,
+                            onLogout = onLogout,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                     composable("ewallet") { StylePartnerDashboard() }
                     composable("codSettings") { CODSettings() }
-                    composable("adminControl") { 
+                    composable("adminControl") {
                         AdminControlScreen(onBack = { navController.popBackStack() })
                     }
                     composable("adminSearchBlock") {
@@ -371,7 +457,7 @@ fun AdminPinDialog(onDismiss: () -> Unit, onSuccess: () -> Unit) {
                 Text("Admin Access Control", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 Text("Enter Secret PIN to unlock ERP Ultima", color = Color.Gray, fontSize = 12.sp)
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 OutlinedTextField(
                     value = pin,
                     onValueChange = { pin = it; error = false },
@@ -380,13 +466,13 @@ fun AdminPinDialog(onDismiss: () -> Unit, onSuccess: () -> Unit) {
                     isError = error,
                     singleLine = true
                 )
-                
+
                 if (error) {
                     Text("Incorrect PIN. Please try again.", color = Color.Red, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                 }
-                
+
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 Button(
                     onClick = {
                         if (pin == "2026") onSuccess()
